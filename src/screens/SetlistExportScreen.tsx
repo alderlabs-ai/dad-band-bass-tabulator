@@ -9,11 +9,60 @@ import { useBassTab } from '../store/BassTabProvider';
 import { Song } from '../types/models';
 import { flattenSectionsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
+import { useWebPrintStyles } from '../utils/useWebPrintStyles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExportSetlist'>;
 
+const printCss = `
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  @media print {
+    html, body {
+      background: white !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    #setlist-export-print-root,
+    #setlist-export-print-root * {
+      visibility: visible !important;
+    }
+
+    #setlist-export-print-root {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white !important;
+    }
+
+    #setlist-export-print-root [id^="setlist-export-page-"] {
+      break-after: page;
+      page-break-after: always;
+      margin: 0 0 8mm 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+
+    #setlist-export-print-root [id^="setlist-export-page-"]:last-child {
+      break-after: auto;
+      page-break-after: auto;
+      margin-bottom: 0 !important;
+    }
+  }
+`;
+
 export function SetlistExportScreen(_: Props) {
   const { songs, setlist } = useBassTab();
+  useWebPrintStyles('setlist-export-print-styles', printCss);
   const orderedSongs = setlist.songIds
     .map((songId) => songs.find((song) => song.id === songId))
     .filter(Boolean) as Song[];
@@ -60,6 +109,7 @@ export function SetlistExportScreen(_: Props) {
           ) : null}
         </View>
 
+        <View nativeID="setlist-export-print-root" style={styles.printRoot}>
         <View style={styles.setlistBanner}>
           <Text style={styles.setlistTitle}>{setlist.name}</Text>
           <Text style={styles.setlistSubtitle}>
@@ -73,6 +123,7 @@ export function SetlistExportScreen(_: Props) {
 
           return (
             <View
+              nativeID={`setlist-export-page-${index}`}
               key={song.id}
               style={[
                 styles.pageSheet,
@@ -103,11 +154,13 @@ export function SetlistExportScreen(_: Props) {
                   bars={bars}
                   rowAnnotations={chart.rowAnnotations ?? []}
                   tone="light"
+                  compact
                 />
               </View>
             </View>
           );
         })}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -132,10 +185,10 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 28,
-    gap: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
+    gap: 10,
   },
   toolbar: {
     width: '100%',
@@ -150,13 +203,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   toolbarTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     color: '#111827',
   },
   toolbarSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     color: '#4b5563',
   },
   printButton: {
@@ -176,42 +229,47 @@ const styles = StyleSheet.create({
   setlistBanner: {
     width: '100%',
     maxWidth: 820,
-    borderRadius: 20,
-    paddingHorizontal: 22,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     backgroundColor: '#fffdf8',
     borderWidth: 1,
     borderColor: '#d6d3d1',
     gap: 4,
   },
+  printRoot: {
+    width: '100%',
+    maxWidth: 820,
+    gap: 10,
+  },
   setlistTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#111827',
   },
   setlistSubtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#4b5563',
   },
   pageSheet: {
     width: '100%',
     maxWidth: 820,
-    borderRadius: 28,
-    paddingHorizontal: 42,
-    paddingVertical: 40,
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     backgroundColor: '#fffdf8',
     borderWidth: 1,
     borderColor: '#d6d3d1',
-    gap: 22,
+    gap: 14,
   },
   pageBreakSheet: {
     marginBottom: 16,
   },
   pageHeader: {
-    gap: 16,
+    gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e7e5e4',
-    paddingBottom: 18,
+    paddingBottom: 12,
   },
   pageTitleRow: {
     flexDirection: 'row',
@@ -224,48 +282,48 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   songTitle: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '800',
     color: '#111827',
   },
   songSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#4b5563',
   },
   orderBadge: {
-    minWidth: 54,
-    height: 54,
-    borderRadius: 18,
+    minWidth: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: '#f5f5f4',
     alignItems: 'center',
     justifyContent: 'center',
   },
   orderText: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: '#111827',
   },
   metaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   metaPill: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: '#f5f5f4',
     gap: 2,
   },
   metaLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#78716c',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   metaValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1f2937',
   },

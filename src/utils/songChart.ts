@@ -35,6 +35,9 @@ const rebalanceSectionBarCounts = (counts: number[], targetTotalBars: number) =>
 };
 
 export const flattenSectionsToChart = (sections: Section[]): Section => {
+  // The editor works on one continuous chart even though songs are stored as sections.
+  // This function is intentionally display-oriented: it merges section tabs and row
+  // annotations into one synthetic chart for the editing UI.
   const sourceSections =
     sections.length > 0
       ? sections
@@ -89,6 +92,9 @@ export const mergeChartIntoSections = (
   sourceSections: Section[],
   editedChart: Pick<Section, 'tab' | 'rowAnnotations'>,
 ): Section[] => {
+  // This is the inverse seam of flattenSectionsToChart(...). The editor stays flattened,
+  // but persisted song data must remain section-based so section ids, notes, and future
+  // backend semantics survive edits.
   if (sourceSections.length === 0) {
     return [
       {

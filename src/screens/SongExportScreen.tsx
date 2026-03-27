@@ -8,13 +8,51 @@ import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { flattenSectionsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
+import { useWebPrintStyles } from '../utils/useWebPrintStyles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExportSong'>;
+
+const printCss = `
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  @media print {
+    html, body {
+      background: white !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    #song-export-print-root,
+    #song-export-print-root * {
+      visibility: visible !important;
+    }
+
+    #song-export-print-root {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: white !important;
+      box-shadow: none !important;
+    }
+  }
+`;
 
 export function SongExportScreen({ route }: Props) {
   const { songId } = route.params;
   const { songs } = useBassTab();
   const song = songs.find((item) => item.id === songId);
+  useWebPrintStyles('song-export-print-styles', printCss);
 
   if (!song) {
     return (
@@ -61,7 +99,7 @@ export function SongExportScreen({ route }: Props) {
           ) : null}
         </View>
 
-        <View style={styles.pageSheet}>
+        <View nativeID="song-export-print-root" style={styles.pageSheet}>
           <View style={styles.pageHeader}>
             <View style={styles.pageTitleBlock}>
               <Text style={styles.songTitle}>{song.title}</Text>
@@ -81,6 +119,7 @@ export function SongExportScreen({ route }: Props) {
               bars={bars}
               rowAnnotations={chart.rowAnnotations ?? []}
               tone="light"
+              compact
             />
           </View>
         </View>
@@ -108,10 +147,10 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 28,
-    gap: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
+    gap: 10,
   },
   toolbar: {
     width: '100%',
@@ -126,13 +165,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   toolbarTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     color: '#111827',
   },
   toolbarSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     color: '#4b5563',
   },
   printButton: {
@@ -152,53 +191,53 @@ const styles = StyleSheet.create({
   pageSheet: {
     width: '100%',
     maxWidth: 820,
-    borderRadius: 28,
-    paddingHorizontal: 42,
-    paddingVertical: 40,
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     backgroundColor: '#fffdf8',
     borderWidth: 1,
     borderColor: '#d6d3d1',
-    gap: 22,
+    gap: 14,
   },
   pageHeader: {
-    gap: 16,
+    gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e7e5e4',
-    paddingBottom: 18,
+    paddingBottom: 12,
   },
   pageTitleBlock: {
     gap: 4,
   },
   songTitle: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '800',
     color: '#111827',
   },
   songSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#4b5563',
   },
   metaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   metaPill: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: '#f5f5f4',
     gap: 2,
   },
   metaLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#78716c',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   metaValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1f2937',
   },

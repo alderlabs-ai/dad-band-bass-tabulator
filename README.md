@@ -2,6 +2,82 @@
 
 Expo-managed React Native app for bass tab editing and performance workflows.
 
+## Architecture Notes
+
+The current app is small, but there are a few design choices that matter if this grows into a multi-platform product.
+
+### 1. Songs are stored as sections
+
+The source-of-truth song model is section-based:
+
+- each `Song` has `sections`
+- each `Section` has `name`, `notes`, `tab`, and optional row annotations
+
+See:
+
+- `src/types/models.ts`
+- `src/data/seed.ts`
+
+### 2. The editor uses a flattened chart view
+
+The song editor does **not** edit sections one-by-one. Instead, it flattens all sections into one continuous chart for editing convenience.
+
+That behavior lives in:
+
+- `src/utils/songChart.ts`
+- `src/screens/SongEditorScreen.tsx`
+
+Important invariant:
+
+- the UI may flatten sections for editing
+- persisted song data must remain section-based
+
+`flattenSectionsToChart(...)` is for display/editing.
+
+`mergeChartIntoSections(...)` writes the edited chart back into the original section structure.
+
+If you change the editor later, protect that invariant. Losing section boundaries will break notes, section labels, and future backend semantics.
+
+### 3. Tab editing is text-to-structure-to-text
+
+The tab editor is built around a simple transformation model:
+
+1. parse tab text into bars/cells
+2. edit those bars/cells in the UI
+3. render bars back to tab text
+
+Core utility:
+
+- `src/utils/tabLayout.ts`
+
+This is the most important logic to test if the app becomes production-grade.
+
+### 4. Local persistence is only a local cache layer
+
+Songs and setlist are currently persisted with AsyncStorage in:
+
+- `src/store/BassTabProvider.tsx`
+
+This is **not** backend sync. It only gives:
+
+- local survival across reload/app restart
+- offline access to whatever is already on the device
+
+When a backend is added, AsyncStorage should be treated as the on-device cache / local persistence layer, not the source of truth.
+
+### 5. Performance view and export are different concerns
+
+- `PerformanceView` is a stage-reading screen
+- export screens are print/PDF oriented
+
+See:
+
+- `src/screens/LiveViewScreen.tsx`
+- `src/screens/SongExportScreen.tsx`
+- `src/screens/SetlistExportScreen.tsx`
+
+They may look similar, but they serve different workflows and should not be conflated.
+
 ## Linux workflow
 
 Most of this app can be developed and validated on Linux:

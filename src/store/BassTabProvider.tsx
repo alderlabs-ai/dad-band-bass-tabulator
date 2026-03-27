@@ -56,6 +56,9 @@ export function BassTabProvider({ children }: PropsWithChildren) {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
+    // AsyncStorage is currently just the app-local persistence layer.
+    // It preserves data across reloads/restarts, but it is not a sync engine or
+    // the long-term source of truth once a backend exists.
     let isMounted = true;
 
     const hydrate = async () => {
