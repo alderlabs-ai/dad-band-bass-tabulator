@@ -97,6 +97,7 @@ export function SectionEditorCard({
 }: SectionEditorCardProps) {
   const { width } = useWindowDimensions();
   const isPreviewCompact = width < 760;
+  const isCompactLayout = width < 760;
   const [activeRowIndex, setActiveRowIndex] = useState(-1);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [copiedBlock, setCopiedBlock] = useState<{
@@ -429,7 +430,7 @@ export function SectionEditorCard({
 
               return (
                 <View key={`${section.id}-row-${row.rowIndex}`} style={styles.rowCard}>
-                  <View style={styles.rowCardHeader}>
+                  <View style={[styles.rowCardHeader, isCompactLayout && styles.rowCardHeaderCompact]}>
                     <View style={styles.rowInfo}>
                       <Text style={styles.rowTitle}>
                         {row.annotation.label?.trim()
@@ -443,23 +444,47 @@ export function SectionEditorCard({
                           : ''}
                       </Text>
                       {activeRowIndex !== row.rowIndex ? (
-                        <TabPagePreview
-                          stringNames={stringNames}
-                          bars={row.bars}
-                          rowAnnotations={[row.annotation]}
-                          rowBarCounts={[row.barCount]}
-                          compact
-                          style={styles.rowMiniPreview}
-                        />
+                        isCompactLayout ? (
+                          <ScrollView
+                            horizontal
+                            nestedScrollEnabled
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.rowPreviewScroll}
+                            contentContainerStyle={styles.rowPreviewScrollContent}
+                          >
+                            <TabPagePreview
+                              stringNames={stringNames}
+                              bars={row.bars}
+                              rowAnnotations={[row.annotation]}
+                              rowBarCounts={[row.barCount]}
+                              compact
+                              style={styles.rowMiniPreview}
+                            />
+                          </ScrollView>
+                        ) : (
+                          <TabPagePreview
+                            stringNames={stringNames}
+                            bars={row.bars}
+                            rowAnnotations={[row.annotation]}
+                            rowBarCounts={[row.barCount]}
+                            compact
+                            style={styles.rowMiniPreview}
+                          />
+                        )
                       ) : null}
                     </View>
-                    <View style={styles.rowSidebar}>
-                      <View style={styles.rowHeaderActions}>
+                    <View style={[styles.rowSidebar, isCompactLayout && styles.rowSidebarCompact]}>
+                      <View
+                        style={[
+                          styles.rowHeaderActions,
+                          isCompactLayout && styles.rowHeaderActionsCompact,
+                        ]}
+                      >
                         <PrimaryButton
                           label="Copy Block"
                           onPress={duplicateRow}
                           variant="ghost"
-                          style={styles.sidebarButton}
+                          style={[styles.sidebarButton, isCompactLayout && styles.sidebarButtonCompact]}
                           size="compact"
                         />
                         <PrimaryButton
@@ -468,6 +493,7 @@ export function SectionEditorCard({
                           variant="ghost"
                           style={[
                             styles.sidebarButton,
+                            isCompactLayout && styles.sidebarButtonCompact,
                             !copiedBlock ? styles.disabled : undefined,
                           ]}
                           size="compact"
@@ -480,6 +506,7 @@ export function SectionEditorCard({
                           variant="ghost"
                           style={[
                             styles.sidebarButton,
+                            isCompactLayout && styles.sidebarButtonCompact,
                             !copiedBlock ? styles.disabled : undefined,
                           ]}
                           size="compact"
@@ -488,32 +515,35 @@ export function SectionEditorCard({
                           label="Insert Row"
                           onPress={insertRowAfter}
                           variant="ghost"
-                          style={styles.sidebarButton}
+                          style={[styles.sidebarButton, isCompactLayout && styles.sidebarButtonCompact]}
                           size="compact"
                         />
                         <PrimaryButton
                           label="Clear Row"
                           onPress={clearRow}
                           variant="ghost"
-                          style={styles.sidebarButton}
+                          style={[styles.sidebarButton, isCompactLayout && styles.sidebarButtonCompact]}
                           size="compact"
                         />
                         <PrimaryButton
                           label="Delete"
                           onPress={deleteRow}
                           variant="ghost"
-                          style={styles.sidebarButton}
+                          style={[styles.sidebarButton, isCompactLayout && styles.sidebarButtonCompact]}
                           size="compact"
                         />
                         <PrimaryButton
                           label="Edit"
                           onPress={() => setActiveRowIndex(row.rowIndex)}
                           variant="ghost"
-                          style={styles.sidebarButtonWide}
+                          style={[
+                            styles.sidebarButtonWide,
+                            isCompactLayout && styles.sidebarButtonCompact,
+                          ]}
                           size="compact"
                         />
                       </View>
-                      <View style={styles.rowMetaFields}>
+                      <View style={[styles.rowMetaFields, isCompactLayout && styles.rowMetaFieldsCompact]}>
                         <View style={styles.rowMetaLabelField}>
                           <Field
                             label="Block Label"
@@ -1251,6 +1281,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
+  rowCardHeaderCompact: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   rowInfo: {
     flex: 1,
     minWidth: 0,
@@ -1260,17 +1294,26 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'stretch',
   },
+  rowSidebarCompact: {
+    width: '100%',
+  },
   rowHeaderActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     justifyContent: 'space-between',
   },
+  rowHeaderActionsCompact: {
+    justifyContent: 'flex-start',
+  },
   sidebarButton: {
     width: 104,
     minHeight: 36,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  sidebarButtonCompact: {
+    width: '100%',
   },
   sidebarButtonWide: {
     width: '100%',
@@ -1285,6 +1328,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
+  },
+  rowMetaFieldsCompact: {
+    flexDirection: 'column',
   },
   rowMetaLabelField: {
     flex: 1,
@@ -1339,6 +1385,12 @@ const styles = StyleSheet.create({
   },
   rowMiniPreview: {
     marginTop: 6,
+  },
+  rowPreviewScroll: {
+    marginTop: 6,
+  },
+  rowPreviewScrollContent: {
+    paddingRight: 12,
   },
   activeRowPanel: {
     borderWidth: 1,
