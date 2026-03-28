@@ -40,6 +40,7 @@ interface SectionEditorCardProps {
 
 const beatLabels = ['1', '&', '2', '&', '3', '&', '4', '&'];
 const barsPerRow = 4;
+const fretOptions = Array.from({ length: 20 }, (_value, index) => String(index));
 
 const parseAnnotationControls = (value: string) => {
   const alignMatch = value.trim().match(/^\[(left|center|right)\]\s*/i);
@@ -720,9 +721,6 @@ function RowEditor({
   const barPadding = isSmallViewport ? 4 : 6;
   const barWidth = cellSize * beatLabels.length + cellGap * (beatLabels.length - 1) + barPadding * 2;
   const footerButtonWidth = Math.floor((barWidth - barPadding * 2 - cellGap) / 2);
-  const barRowGap = 6;
-  const editorTrackWidth =
-    row.bars.length * barWidth + Math.max(0, row.bars.length - 1) * barRowGap;
   const [selectedCell, setSelectedCell] = useState<{
     globalBarIndex: number;
     rowBarIndex: number;
@@ -730,7 +728,7 @@ function RowEditor({
     stringIndex: number;
     slotIndex: number;
   } | null>(null);
-  const [mobileCellDraft, setMobileCellDraft] = useState('');
+  const [activeMobileBarIndex, setActiveMobileBarIndex] = useState(0);
 
   useEffect(() => {
     if (!useMobileCellEditor) {
@@ -738,6 +736,7 @@ function RowEditor({
       return;
     }
 
+    setActiveMobileBarIndex(0);
     setSelectedCell({
       globalBarIndex: row.startBarIndex,
       rowBarIndex: 0,
@@ -748,16 +747,18 @@ function RowEditor({
   }, [row.rowIndex, row.startBarIndex, stringNames, useMobileCellEditor]);
 
   useEffect(() => {
-    if (!useMobileCellEditor || !selectedCell) {
-      setMobileCellDraft('');
+    if (!useMobileCellEditor) {
       return;
     }
 
-    const nextValue =
-      row.bars[selectedCell.rowBarIndex]?.cells[selectedCell.stringName]?.[selectedCell.slotIndex] ?? '-';
-
-    setMobileCellDraft(nextValue === '-' ? '' : nextValue);
-  }, [row.bars, selectedCell, useMobileCellEditor]);
+    setSelectedCell((currentCell) => ({
+      globalBarIndex: row.startBarIndex + activeMobileBarIndex,
+      rowBarIndex: activeMobileBarIndex,
+      stringName: currentCell?.stringName ?? stringNames[0],
+      stringIndex: currentCell?.stringIndex ?? 0,
+      slotIndex: currentCell?.slotIndex ?? 0,
+    }));
+  }, [activeMobileBarIndex, row.startBarIndex, stringNames, useMobileCellEditor]);
 
   const clearBar = (barIndex: number) => {
     const nextBars = bars.map((bar, currentBarIndex) => {
@@ -848,6 +849,96 @@ function RowEditor({
     });
   };
 
+  const activeMobileBar = row.bars[activeMobileBarIndex];
+  const activeGlobalBarIndex = row.startBarIndex + activeMobileBarIndex;
+  const selectedCellValue =
+    selectedCell
+      ? row.bars[selectedCell.rowBarIndex]?.cells[selectedCell.stringName]?.[selectedCell.slotIndex] ?? '-'
+      : '-';
+
+  const renderBarActions = (bar: ParsedBar, globalBarIndex: number) => (
+    <View style={styles.barFooter}>
+      <PrimaryButton
+        label="Insert"
+        onPress={() =>
+          applyRowCountDelta(
+            insertBar(bars, globalBarIndex, stringNames),
+            1,
+          )
+        }
+        variant="ghost"
+        style={[styles.barFooterButton, { width: footerButtonWidth }]}
+      />
+      <PrimaryButton
+        label="Duplicate"
+        onPress={() =>
+          applyRowCountDelta(
+            insertBar(bars, globalBarIndex + 1, stringNames, bar),
+            1,
+          )
+        }
+        variant="ghost"
+        style={[styles.barFooterButton, { width: footerButtonWidth }]}
+      />
+      <PrimaryButton
+        label="Copy"
+        onPress={() => setCopiedBar(cloneBar(bar))}
+        variant="ghost"
+        style={[styles.barFooterButton, { width: footerButtonWidth }]}
+      />
+      <PrimaryButton
+        label="Paste Here"
+        onPress={() =>
+          copiedBar
+            ? replaceBar(globalBarIndex, copiedBar)
+            : undefined
+        }
+        variant="ghost"
+        style={[
+          styles.barFooterButton,
+          { width: footerButtonWidth },
+          !copiedBar ? styles.disabled : undefined,
+        ]}
+      />
+      <PrimaryButton
+        label="Paste New"
+        onPress={() =>
+          copiedBar
+            ? applyRowCountDelta(
+                insertBar(
+                  bars,
+                  globalBarIndex + 1,
+                  stringNames,
+                  copiedBar,
+                ),
+                1,
+              )
+            : undefined
+        }
+        variant="ghost"
+        style={[
+          styles.barFooterButton,
+          { width: footerButtonWidth },
+          !copiedBar ? styles.disabled : undefined,
+        ]}
+      />
+      <PrimaryButton
+        label="Clear"
+        onPress={() => clearBar(globalBarIndex)}
+        variant="ghost"
+        style={[styles.barFooterButton, { width: footerButtonWidth }]}
+      />
+      <PrimaryButton
+        label="Delete"
+        onPress={() =>
+          applyRowCountDelta(removeBar(bars, globalBarIndex, stringNames), -1)
+        }
+        variant="danger"
+        style={[styles.barFooterButton, { width: footerButtonWidth }]}
+      />
+    </View>
+  );
+
   return (
     <View style={styles.activeRowPanel}>
       <View style={styles.activeRowHeader}>
@@ -858,7 +949,9 @@ function RowEditor({
               : `Editing Bars ${row.startBarIndex + 1}-${row.startBarIndex + row.bars.length}`}
           </Text>
           <Text style={styles.activeRowHint}>
-            Bars {row.startBarIndex + 1}-{row.startBarIndex + row.bars.length}. Dense grid for faster entry.
+            {useMobileCellEditor
+              ? `Bars ${row.startBarIndex + 1}-${row.startBarIndex + row.bars.length}. Tap a box, then use the bar and fret buttons below.`
+              : `Bars ${row.startBarIndex + 1}-${row.startBarIndex + row.bars.length}. Dense grid for faster entry.`}
           </Text>
         </View>
         <PrimaryButton
@@ -901,92 +994,231 @@ function RowEditor({
         />
       )}
 
-      <ScrollView
-        horizontal
-        nestedScrollEnabled
-        directionalLockEnabled
-        alwaysBounceHorizontal
-        keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator
-        style={styles.gridScroll}
-        contentContainerStyle={styles.gridScrollContent}
-      >
-        <View style={styles.grid}>
-          <View style={styles.gridRow}>
-            <View style={styles.labelCell} />
-            {row.bars.map((_, rowBarIndex) => (
-              <View
-                key={`${sectionId}-row-head-${rowBarIndex}`}
-                style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
+      {useMobileCellEditor ? (
+        <View style={styles.mobileEditorStack}>
+          <View style={styles.mobileBarSelector}>
+            {row.bars.map((_bar, rowBarIndex) => (
+              <Pressable
+                key={`${sectionId}-mobile-bar-${rowBarIndex}`}
+                onPress={() => setActiveMobileBarIndex(rowBarIndex)}
+                style={[
+                  styles.mobileBarButton,
+                  activeMobileBarIndex === rowBarIndex && styles.mobileBarButtonActive,
+                ]}
               >
-                <Text style={styles.barBlockTitle}>Bar {row.startBarIndex + rowBarIndex + 1}</Text>
-                <View style={[styles.beatRow, { gap: cellGap }]}>
-                  {beatLabels.map((label) => (
-                    <View
-                      key={`${sectionId}-row-${row.rowIndex}-beat-${rowBarIndex}-${label}`}
-                      style={[styles.beatCell, { width: cellSize }]}
-                    >
-                      <Text style={styles.beatLabel}>{label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+                <Text
+                  style={[
+                    styles.mobileBarButtonLabel,
+                    activeMobileBarIndex === rowBarIndex && styles.mobileBarButtonLabelActive,
+                  ]}
+                >
+                  {row.startBarIndex + rowBarIndex + 1}
+                </Text>
+              </Pressable>
             ))}
           </View>
 
-          {stringNames.map((stringName, stringIndex) => (
-            <View
-              key={`${sectionId}-row-${row.rowIndex}-${stringName}`}
-              style={styles.gridRow}
-            >
-              <View style={styles.labelCell}>
-                <Text style={styles.stringLabel}>{stringName}</Text>
+          {activeMobileBar ? (
+            <View style={styles.mobileSingleBarPanel}>
+              <View style={styles.gridRow}>
+                <View style={styles.labelCell} />
+                <View style={[styles.barBlock, styles.mobileBarBlock, { width: barWidth, padding: barPadding }]}>
+                  <Text style={styles.barBlockTitle}>Bar {activeGlobalBarIndex + 1}</Text>
+                  <View style={[styles.beatRow, { gap: cellGap }]}>
+                    {beatLabels.map((label) => (
+                      <View
+                        key={`${sectionId}-row-${row.rowIndex}-mobile-beat-${activeMobileBarIndex}-${label}`}
+                        style={[styles.beatCell, { width: cellSize }]}
+                      >
+                        <Text style={styles.beatLabel}>{label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
               </View>
 
-              {row.bars.map((bar, rowBarIndex) => {
-                const globalBarIndex = row.startBarIndex + rowBarIndex;
-
-                return (
-                  <View
-                    key={`${sectionId}-bar-grid-${globalBarIndex}-${stringName}`}
-                    style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
-                  >
+              {stringNames.map((stringName, stringIndex) => (
+                <View
+                  key={`${sectionId}-mobile-row-${row.rowIndex}-${stringName}`}
+                  style={styles.gridRow}
+                >
+                  <View style={styles.labelCell}>
+                    <Text style={styles.stringLabel}>{stringName}</Text>
+                  </View>
+                  <View style={[styles.barBlock, styles.mobileBarBlock, { width: barWidth, padding: barPadding }]}>
                     <View style={[styles.slotRow, { gap: cellGap }]}>
-                      {(bar.cells[stringName] ?? []).map((cellValue, slotIndex) => {
-                        const cellKey = getCellKey(
-                          row.rowIndex,
-                          rowBarIndex,
-                          stringIndex,
-                          slotIndex,
-                        );
+                      {(activeMobileBar.cells[stringName] ?? []).map((cellValue, slotIndex) => (
+                        <Pressable
+                          key={`${sectionId}-mobile-cell-${activeGlobalBarIndex}-${stringName}-${slotIndex}`}
+                          onPress={() =>
+                            setSelectedCell({
+                              globalBarIndex: activeGlobalBarIndex,
+                              rowBarIndex: activeMobileBarIndex,
+                              stringName,
+                              stringIndex,
+                              slotIndex,
+                            })
+                          }
+                          style={[
+                            styles.slotButton,
+                            { width: cellSize, minHeight: cellSize + 2 },
+                            selectedCell?.globalBarIndex === activeGlobalBarIndex &&
+                            selectedCell?.stringName === stringName &&
+                            selectedCell?.slotIndex === slotIndex &&
+                            styles.slotButtonActive,
+                          ]}
+                        >
+                          <Text style={styles.slotButtonLabel}>
+                            {cellValue === '-' ? '-' : cellValue}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
-                        return (
-                          useMobileCellEditor ? (
-                            <Pressable
-                              key={cellKey}
-                              onPress={() =>
-                                setSelectedCell({
-                                  globalBarIndex,
-                                  rowBarIndex,
-                                  stringName,
-                                  stringIndex,
-                                  slotIndex,
-                                })
-                              }
-                              style={[
-                                styles.slotButton,
-                                { width: cellSize, minHeight: cellSize + 2 },
-                                selectedCell?.globalBarIndex === globalBarIndex &&
-                                selectedCell?.stringName === stringName &&
-                                selectedCell?.slotIndex === slotIndex &&
-                                styles.slotButtonActive,
-                              ]}
-                            >
-                              <Text style={styles.slotButtonLabel}>
-                                {cellValue === '-' ? '-' : cellValue}
-                              </Text>
-                            </Pressable>
-                          ) : (
+          {selectedCell ? (
+            <View style={styles.mobilePadPanel}>
+              <View style={styles.mobilePadHeader}>
+                <Text style={styles.mobilePadTitle}>
+                  {`${selectedCell.stringName} string • Bar ${selectedCell.globalBarIndex + 1} • Beat ${beatLabels[selectedCell.slotIndex]}`}
+                </Text>
+                <Text style={styles.mobilePadValue}>
+                  {selectedCellValue === '-' ? 'Empty' : `Fret ${selectedCellValue}`}
+                </Text>
+              </View>
+              <View style={styles.mobilePadActions}>
+                <PrimaryButton
+                  label="Prev"
+                  onPress={() => moveSelectedCell(-1)}
+                  variant="ghost"
+                  size="compact"
+                  style={styles.mobilePadActionButton}
+                />
+                <PrimaryButton
+                  label="Next"
+                  onPress={() => moveSelectedCell(1)}
+                  variant="ghost"
+                  size="compact"
+                  style={styles.mobilePadActionButton}
+                />
+                <PrimaryButton
+                  label="Clear"
+                  onPress={() =>
+                    onCellChange(
+                      selectedCell.globalBarIndex,
+                      selectedCell.stringName,
+                      selectedCell.slotIndex,
+                      '',
+                    )
+                  }
+                  variant="secondary"
+                  size="compact"
+                  style={styles.mobilePadActionButton}
+                />
+              </View>
+              <View style={styles.mobileFretPad}>
+                {fretOptions.map((fret) => (
+                  <Pressable
+                    key={`${sectionId}-fret-${fret}`}
+                    onPress={() =>
+                      onCellChange(
+                        selectedCell.globalBarIndex,
+                        selectedCell.stringName,
+                        selectedCell.slotIndex,
+                        fret,
+                      )
+                    }
+                    style={[
+                      styles.mobileFretButton,
+                      selectedCellValue === fret && styles.mobileFretButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.mobileFretButtonLabel,
+                        selectedCellValue === fret && styles.mobileFretButtonLabelActive,
+                      ]}
+                    >
+                      {fret}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {activeMobileBar ? (
+            <View style={[styles.barBlock, styles.mobileBarActionsBlock, { padding: barPadding }]}>
+              {renderBarActions(activeMobileBar, activeGlobalBarIndex)}
+              <View style={styles.barFooterSpacer} />
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
+          alwaysBounceHorizontal
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator
+          style={styles.gridScroll}
+          contentContainerStyle={styles.gridScrollContent}
+        >
+          <View style={styles.grid}>
+            <View style={styles.gridRow}>
+              <View style={styles.labelCell} />
+              {row.bars.map((_, rowBarIndex) => (
+                <View
+                  key={`${sectionId}-row-head-${rowBarIndex}`}
+                  style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
+                >
+                  <Text style={styles.barBlockTitle}>Bar {row.startBarIndex + rowBarIndex + 1}</Text>
+                  <View style={[styles.beatRow, { gap: cellGap }]}>
+                    {beatLabels.map((label) => (
+                      <View
+                        key={`${sectionId}-row-${row.rowIndex}-beat-${rowBarIndex}-${label}`}
+                        style={[styles.beatCell, { width: cellSize }]}
+                      >
+                        <Text style={styles.beatLabel}>{label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {stringNames.map((stringName, stringIndex) => (
+              <View
+                key={`${sectionId}-row-${row.rowIndex}-${stringName}`}
+                style={styles.gridRow}
+              >
+                <View style={styles.labelCell}>
+                  <Text style={styles.stringLabel}>{stringName}</Text>
+                </View>
+
+                {row.bars.map((bar, rowBarIndex) => {
+                  const globalBarIndex = row.startBarIndex + rowBarIndex;
+
+                  return (
+                    <View
+                      key={`${sectionId}-bar-grid-${globalBarIndex}-${stringName}`}
+                      style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
+                    >
+                      <View style={[styles.slotRow, { gap: cellGap }]}>
+                        {(bar.cells[stringName] ?? []).map((cellValue, slotIndex) => {
+                          const cellKey = getCellKey(
+                            row.rowIndex,
+                            rowBarIndex,
+                            stringIndex,
+                            slotIndex,
+                          );
+
+                          return (
                             <TextInput
                               key={cellKey}
                               ref={(element) => {
@@ -1014,174 +1246,34 @@ function RowEditor({
                               placeholder="-"
                               placeholderTextColor={palette.textMuted}
                             />
-                          )
-                        );
-                      })}
+                          );
+                        })}
+                      </View>
                     </View>
+                  );
+                })}
+              </View>
+            ))}
+
+            <View style={styles.gridRow}>
+              <View style={styles.labelCell} />
+              {row.bars.map((bar, rowBarIndex) => {
+                const globalBarIndex = row.startBarIndex + rowBarIndex;
+
+                return (
+                  <View
+                    key={`${sectionId}-bar-actions-${globalBarIndex}`}
+                    style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
+                  >
+                    {renderBarActions(bar, globalBarIndex)}
+                    <View style={styles.barFooterSpacer} />
                   </View>
                 );
               })}
             </View>
-          ))}
-
-          {useMobileCellEditor && selectedCell ? (
-            <View style={styles.gridRow}>
-              <View style={styles.labelCell} />
-              <View style={[styles.mobileCellEditor, { width: editorTrackWidth }]}>
-                <Text style={styles.mobileCellEditorLabel}>
-                  {`${selectedCell.stringName} • Bar ${selectedCell.globalBarIndex + 1} • Beat ${beatLabels[selectedCell.slotIndex]}`}
-                </Text>
-                <View style={styles.mobileCellEditorRow}>
-                  <TextInput
-                    key={`${selectedCell.globalBarIndex}-${selectedCell.stringName}-${selectedCell.slotIndex}`}
-                    value={mobileCellDraft}
-                    onChangeText={(value) => {
-                      setMobileCellDraft(value);
-                      onCellChange(
-                        selectedCell.globalBarIndex,
-                        selectedCell.stringName,
-                        selectedCell.slotIndex,
-                        value,
-                      );
-                    }}
-                    maxLength={2}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    style={styles.mobileCellEditorInput}
-                    placeholder="-"
-                    placeholderTextColor={palette.textMuted}
-                  />
-                  <PrimaryButton
-                    label="Clear"
-                    onPress={() =>
-                      onCellChange(
-                        selectedCell.globalBarIndex,
-                        selectedCell.stringName,
-                        selectedCell.slotIndex,
-                        '',
-                      )
-                    }
-                    variant="ghost"
-                    size="compact"
-                    style={styles.mobileCellEditorButton}
-                  />
-                  <PrimaryButton
-                    label="Prev"
-                    onPress={() => moveSelectedCell(-1)}
-                    variant="ghost"
-                    size="compact"
-                    style={styles.mobileCellEditorButton}
-                  />
-                  <PrimaryButton
-                    label="Next"
-                    onPress={() => moveSelectedCell(1)}
-                    variant="secondary"
-                    size="compact"
-                    style={styles.mobileCellEditorButton}
-                  />
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          <View style={styles.gridRow}>
-            <View style={styles.labelCell} />
-            {row.bars.map((bar, rowBarIndex) => {
-              const globalBarIndex = row.startBarIndex + rowBarIndex;
-
-              return (
-                <View
-                  key={`${sectionId}-bar-actions-${globalBarIndex}`}
-                  style={[styles.barBlock, { width: barWidth, padding: barPadding }]}
-                >
-                  <View style={[styles.barFooter, { gap: cellGap }]}>
-                    <PrimaryButton
-                      label="Insert"
-                      onPress={() =>
-                        applyRowCountDelta(
-                          insertBar(bars, globalBarIndex, stringNames),
-                          1,
-                        )
-                      }
-                      variant="ghost"
-                      style={[styles.barFooterButton, { width: footerButtonWidth }]}
-                    />
-                    <PrimaryButton
-                      label="Duplicate"
-                      onPress={() =>
-                        applyRowCountDelta(
-                          insertBar(bars, globalBarIndex + 1, stringNames, bar),
-                          1,
-                        )
-                      }
-                      variant="ghost"
-                      style={[styles.barFooterButton, { width: footerButtonWidth }]}
-                    />
-                    <PrimaryButton
-                      label="Copy"
-                      onPress={() => setCopiedBar(cloneBar(bar))}
-                      variant="ghost"
-                      style={[styles.barFooterButton, { width: footerButtonWidth }]}
-                    />
-                    <PrimaryButton
-                      label="Paste Here"
-                      onPress={() =>
-                        copiedBar
-                          ? replaceBar(globalBarIndex, copiedBar)
-                          : undefined
-                      }
-                      variant="ghost"
-                      style={[
-                        styles.barFooterButton,
-                        { width: footerButtonWidth },
-                        !copiedBar ? styles.disabled : undefined,
-                      ]}
-                    />
-                    <PrimaryButton
-                      label="Paste New"
-                      onPress={() =>
-                        copiedBar
-                          ? applyRowCountDelta(
-                              insertBar(
-                                bars,
-                                globalBarIndex + 1,
-                                stringNames,
-                                copiedBar,
-                              ),
-                              1,
-                            )
-                          : undefined
-                      }
-                      variant="ghost"
-                      style={[
-                        styles.barFooterButton,
-                        { width: footerButtonWidth },
-                        !copiedBar ? styles.disabled : undefined,
-                      ]}
-                    />
-                    <PrimaryButton
-                      label="Clear"
-                      onPress={() => clearBar(globalBarIndex)}
-                      variant="ghost"
-                      style={[styles.barFooterButton, { width: footerButtonWidth }]}
-                    />
-                    <PrimaryButton
-                      label="Delete"
-                      onPress={() =>
-                        applyRowCountDelta(removeBar(bars, globalBarIndex, stringNames), -1)
-                      }
-                      variant="danger"
-                      style={[styles.barFooterButton, { width: footerButtonWidth }]}
-                    />
-                  </View>
-                  <View style={styles.barFooterSpacer} />
-                </View>
-              );
-            })}
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {useSimpleAnnotationFields ? (
         <Field
@@ -1668,6 +1760,40 @@ const styles = StyleSheet.create({
     minWidth: '100%',
     paddingBottom: 4,
   },
+  mobileEditorStack: {
+    gap: 12,
+  },
+  mobileBarSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mobileBarButton: {
+    minWidth: 42,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileBarButtonActive: {
+    borderColor: palette.primary,
+    backgroundColor: '#e0f3ef',
+  },
+  mobileBarButtonLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  mobileBarButtonLabelActive: {
+    color: palette.primary,
+  },
+  mobileSingleBarPanel: {
+    gap: 6,
+  },
   gridRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1689,6 +1815,9 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 12,
     backgroundColor: '#eef2f7',
+  },
+  mobileBarBlock: {
+    maxWidth: '100%',
   },
   barBlockTitle: {
     fontSize: 12,
@@ -1744,7 +1873,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  mobileCellEditor: {
+  mobilePadPanel: {
     gap: 8,
     padding: 12,
     borderRadius: 14,
@@ -1752,18 +1881,59 @@ const styles = StyleSheet.create({
     borderColor: palette.primary,
     backgroundColor: '#ffffff',
   },
-  mobileCellEditorLabel: {
+  mobilePadHeader: {
+    gap: 2,
+  },
+  mobilePadTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: palette.text,
   },
-  mobileCellEditorRow: {
+  mobilePadValue: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: palette.textMuted,
+  },
+  mobilePadActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    alignItems: 'center',
   },
-  mobileCellEditorInput: {
+  mobilePadActionButton: {
+    minHeight: 38,
+  },
+  mobileFretPad: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mobileFretButton: {
+    minWidth: 46,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileFretButtonActive: {
+    borderColor: palette.primary,
+    backgroundColor: '#e0f3ef',
+  },
+  mobileFretButtonLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  mobileFretButtonLabelActive: {
+    color: palette.primary,
+  },
+  mobileBarActionsBlock: {
+    width: '100%',
+  },
+  mobileActionHint: {
     minHeight: 48,
     minWidth: 96,
     borderRadius: 10,
@@ -1776,9 +1946,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
-  },
-  mobileCellEditorButton: {
-    minHeight: 38,
   },
   barFooter: {
     flexDirection: 'row',
