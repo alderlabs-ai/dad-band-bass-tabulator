@@ -8,6 +8,7 @@ interface TabPagePreviewProps {
   stringNames: string[];
   bars: ParsedBar[];
   rowAnnotations?: TabRowAnnotation[];
+  rowBarCounts?: number[];
   barsPerRow?: number;
   tone?: 'light' | 'dark';
   compact?: boolean;
@@ -26,6 +27,9 @@ interface Segment {
 }
 
 const beatGuide = '  |1 & 2 & 3 & 4 &';
+
+const joinRenderedBars = (segments: string[]) =>
+  segments.map((segment, index) => (index === 0 ? segment : segment.slice(1))).join('');
 
 const slotToSegment = (value: string): string => {
   if (!value || value === '-') {
@@ -80,18 +84,26 @@ export function TabPagePreview({
   stringNames,
   bars,
   rowAnnotations = [],
+  rowBarCounts,
   barsPerRow = 4,
   tone = 'light',
   compact = false,
   style,
 }: TabPagePreviewProps) {
   const isDark = tone === 'dark';
+  const resolvedRowBarCounts =
+    rowBarCounts && rowBarCounts.length > 0
+      ? rowBarCounts.filter((count) => count > 0)
+      : Array.from({ length: Math.max(1, Math.ceil(bars.length / barsPerRow)) }, () => barsPerRow);
+
+  let barCursor = 0;
 
   return (
     <View style={[styles.preview, style]}>
-      {Array.from({ length: Math.max(1, Math.ceil(bars.length / barsPerRow)) }, (_, rowIndex) => {
-        const rowBars = bars.slice(rowIndex * barsPerRow, rowIndex * barsPerRow + barsPerRow);
+      {resolvedRowBarCounts.map((barCount, rowIndex) => {
+        const rowBars = bars.slice(barCursor, barCursor + barCount);
         const annotation = rowAnnotations[rowIndex];
+        barCursor += barCount;
 
         return (
           <View key={`preview-row-${rowIndex}`} style={styles.rowBlock}>
@@ -120,7 +132,7 @@ export function TabPagePreview({
                 isDark ? styles.darkTabText : styles.lightTabText,
               ]}
             >
-              {rowBars.map(() => beatGuide).join(' ')}
+              {joinRenderedBars(rowBars.map(() => beatGuide))}
             </Text>
 
             {stringNames.map((stringName) => (
@@ -131,11 +143,11 @@ export function TabPagePreview({
                   isDark ? styles.darkTabText : styles.lightTabText,
                 ]}
               >
-                {`${stringName} ${rowBars
-                  .map((bar) =>
+                {`${stringName} ${joinRenderedBars(
+                  rowBars.map((bar) =>
                     `|${(bar.cells[stringName] ?? []).map(slotToSegment).join('')}|`,
-                  )
-                  .join(' ')}`}
+                  ),
+                )}`}
               </Text>
             ))}
 

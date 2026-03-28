@@ -11,13 +11,13 @@ import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { Song } from '../types/models';
 import { formatUpdatedAt } from '../utils/date';
-import { flattenSectionsToChart, mergeChartIntoSections } from '../utils/songChart';
+import { flattenSongRowsToChart } from '../utils/songChart';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SongEditor'>;
 
 export function SongEditorScreen({ navigation, route }: Props) {
   const { songId } = route.params;
-  const { songs, updateSong } = useBassTab();
+  const { songs, updateSong, updateSongChart } = useBassTab();
 
   const song = songs.find((item) => item.id === songId);
 
@@ -36,14 +36,13 @@ export function SongEditorScreen({ navigation, route }: Props) {
     updateSong(song.id, { [field]: value } as Partial<Song>);
   };
 
-  const chart = flattenSectionsToChart(song.sections);
+  const chart = flattenSongRowsToChart(song);
 
   const handleChartChange = (updates: Partial<typeof chart>) => {
-    updateSong(song.id, {
-      sections: mergeChartIntoSections(song.sections, {
-        tab: updates.tab ?? chart.tab,
-        rowAnnotations: updates.rowAnnotations ?? chart.rowAnnotations ?? [],
-      }),
+    updateSongChart(song.id, {
+      tab: updates.tab ?? chart.tab,
+      rowAnnotations: updates.rowAnnotations ?? chart.rowAnnotations ?? [],
+      rowBarCounts: updates.rowBarCounts ?? chart.rowBarCounts ?? [],
     });
   };
 
@@ -74,8 +73,11 @@ export function SongEditorScreen({ navigation, route }: Props) {
 
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={styles.sectionTitle}>Tab</Text>
+          <Text style={styles.sectionTitle}>Fast Tab Editor</Text>
           <Text style={styles.sectionSubtitle}>
+            Edit one row at a time. New rows start with 4 bars and can be resized from 1 to 8.
+          </Text>
+          <Text style={styles.sectionMeta}>
             Last updated {formatUpdatedAt(song.updatedAt)}
           </Text>
         </View>
@@ -136,6 +138,12 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     fontSize: 14,
+    lineHeight: 20,
+    color: palette.textMuted,
+    marginTop: 4,
+  },
+  sectionMeta: {
+    fontSize: 13,
     color: palette.textMuted,
     marginTop: 4,
   },

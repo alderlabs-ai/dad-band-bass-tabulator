@@ -132,6 +132,9 @@ export const renderTab = (stringNames: string[], bars: ParsedBar[]): string =>
 
 const beatGuide = '  |1 & 2 & 3 & 4 &';
 
+const joinRenderedBars = (segments: string[]) =>
+  segments.map((segment, index) => (index === 0 ? segment : segment.slice(1))).join('');
+
 export const buildTabPagePreview = (
   stringNames: string[],
   bars: ParsedBar[],
@@ -153,18 +156,17 @@ export const buildTabPagePreview = (
       rows.push(`[${annotation.beforeText.trim()}]`);
     }
 
-    rows.push(rowBars.map(() => beatGuide).join(' '));
+    rows.push(joinRenderedBars(rowBars.map(() => beatGuide)));
 
     stringNames.forEach((stringName) => {
-      const renderedLine = rowBars
+      const renderedSegments = rowBars
         .map((bar) =>
           `|${(bar.cells[stringName] ?? Array.from({ length: SLOTS_PER_BAR }, () => EMPTY_SLOT))
             .map(slotToSegment)
             .join('')}|`,
-        )
-        .join(' ');
+        );
 
-      rows.push(`${stringName} ${renderedLine}`);
+      rows.push(`${stringName} ${joinRenderedBars(renderedSegments)}`);
     });
 
     if (annotation?.afterText?.trim()) {

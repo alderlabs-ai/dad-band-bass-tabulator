@@ -7,6 +7,8 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { palette } from '../constants/colors';
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
+import { createId } from '../utils/ids';
+import { parseTab } from '../utils/tabLayout';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ImportPaste'>;
 
@@ -17,17 +19,26 @@ A|7-7-7---5-5-5---|
 E|----------------|`;
 
 export function ImportPasteScreen({ navigation }: Props) {
-  const { createSong, updateSection } = useBassTab();
+  const { createSong, updateSong } = useBassTab();
   const [title, setTitle] = useState('Pasted Tab Draft');
   const [artist, setArtist] = useState('Unknown Artist');
   const [tabText, setTabText] = useState(defaultTab);
 
   const handleCreateDraft = () => {
     const song = createSong({ title, artist });
-    updateSection(song.id, song.sections[0].id, {
-      name: 'Imported Section',
-      notes: 'Imported from pasted text. Clean up phrasing and labels as needed.',
-      tab: tabText,
+    const { stringNames, bars } = parseTab(tabText);
+
+    updateSong(song.id, {
+      stringNames,
+      rows: [
+        {
+          id: createId('row'),
+          label: 'Imported Row',
+          beforeText: '',
+          afterText: '',
+          bars,
+        },
+      ],
     });
 
     navigation.replace('SongEditor', { songId: song.id });

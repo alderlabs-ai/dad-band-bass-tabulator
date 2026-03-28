@@ -1,7 +1,8 @@
-import { MutableRefObject, useMemo, useRef, useState } from 'react';
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NativeSyntheticEvent,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,9 +13,9 @@ import {
 } from 'react-native';
 
 import { palette } from '../constants/colors';
-import { Section, TabRowAnnotation } from '../types/models';
+import { SongChart, TabRowAnnotation } from '../types/models';
+import { normalizeRowBarCounts } from '../utils/songChart';
 import {
-  getRowCount,
   insertBar,
   parseTab,
   ParsedBar,
@@ -26,12 +27,12 @@ import { PrimaryButton } from './PrimaryButton';
 import { TabPagePreview } from './TabPagePreview';
 
 interface SectionEditorCardProps {
-  section: Section;
+  section: SongChart;
   index: number;
   isFirst: boolean;
   isLast: boolean;
   showSectionControls?: boolean;
-  onChange: (updates: Partial<Section>) => void;
+  onChange: (updates: Partial<SongChart>) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
@@ -104,7 +105,11 @@ export function SectionEditorCard({
   const inputRefs = useRef<Record<string, TextInput | null>>({});
 
   const { stringNames, bars } = useMemo(() => parseTab(section.tab), [section.tab]);
-  const rowCount = useMemo(() => getRowCount(bars, barsPerRow), [bars]);
+  const rowBarCounts = useMemo(
+    () => normalizeRowBarCounts(bars.length, section.rowBarCounts),
+    [bars.length, section.rowBarCounts],
+  );
+  const rowCount = rowBarCounts.length;
   const rowAnnotations = useMemo<TabRowAnnotation[]>(
     () =>
       Array.from({ length: rowCount }, (_, rowIndex) => ({
@@ -115,19 +120,39 @@ export function SectionEditorCard({
     [rowCount, section.rowAnnotations],
   );
   const rowSlices = useMemo(
-    () =>
-      Array.from({ length: rowCount }, (_, rowIndex) => ({
-        rowIndex,
-        startBarIndex: rowIndex * barsPerRow,
-        bars: bars.slice(rowIndex * barsPerRow, rowIndex * barsPerRow + barsPerRow),
-        annotation: rowAnnotations[rowIndex],
-      })),
-    [bars, rowAnnotations, rowCount],
+    () => {
+      let startBarIndex = 0;
+
+      return rowBarCounts.map((barCount, rowIndex) => {
+        const nextRow = {
+          rowIndex,
+          startBarIndex,
+          bars: bars.slice(startBarIndex, startBarIndex + barCount),
+          annotation: rowAnnotations[rowIndex],
+          barCount,
+        };
+
+        startBarIndex += barCount;
+        return nextRow;
+      });
+    },
+    [bars, rowAnnotations, rowBarCounts],
   );
-  const splitLayout = Platform.OS === 'web' && width >= 1280 && previewVisible;
 
   const commitBars = (nextBars: ReturnType<typeof parseTab>['bars']) => {
     onChange({ tab: renderTab(stringNames, nextBars) });
+  };
+
+  const commitChart = (
+    nextBars: ReturnType<typeof parseTab>['bars'],
+    nextRowAnnotations = rowAnnotations,
+    nextRowBarCounts = rowBarCounts,
+  ) => {
+    onChange({
+      tab: renderTab(stringNames, nextBars),
+      rowAnnotations: nextRowAnnotations,
+      rowBarCounts: normalizeRowBarCounts(nextBars.length, nextRowBarCounts),
+    });
   };
 
   const updateRowAnnotation = (
@@ -212,11 +237,9 @@ export function SectionEditorCard({
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.heading}>
-          {showSectionControls ? `Section ${index + 1}` : 'Tab'}
-        </Text>
-        {showSectionControls ? (
+      {showSectionControls ? (
+        <View style={styles.header}>
+          <Text style={styles.heading}>{`Section ${index + 1}`}</Text>
           <View style={styles.controls}>
             <PrimaryButton
               label="Up"
@@ -232,46 +255,36 @@ export function SectionEditorCard({
             />
             <PrimaryButton label="Delete" onPress={onDelete} variant="danger" />
           </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {showSectionControls ? (
         <Field
           label="Section Name"
-          value={section.name}
+          value={section.name ?? 'Chart'}
           onChangeText={(value) => onChange({ name: value })}
         />
       ) : null}
       <View style={styles.toolbar}>
-        <View style={styles.toolbarCopy}>
-          <Text style={styles.builderTitle}>Fast Tab Editor</Text>
-          <Text style={styles.builderSubtitle}>
-            Edit one four-bar row at a time. Use arrow keys, Enter, and Tab to move.
-          </Text>
-        </View>
+        {showSectionControls ? (
+          <View style={styles.toolbarCopy}>
+            <Text style={styles.builderTitle}>Fast Tab Editor</Text>
+            <Text style={styles.builderSubtitle}>
+              Edit one row at a time. New rows start with 4 bars and can be resized from 1 to 8.
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.toolbarActions}>
           <PrimaryButton
-            label={previewVisible ? 'Hide Preview' : 'Show Preview'}
+            label="Quick Preview"
             onPress={() => setPreviewVisible((value) => !value)}
             variant="secondary"
-          />
-          <PrimaryButton
-            label="Add Bar"
-            onPress={() => commitBars(insertBar(bars, bars.length, stringNames))}
-            variant="ghost"
-          />
-          <PrimaryButton
-            label="Repeat Last"
-            onPress={() =>
-              commitBars(insertBar(bars, bars.length, stringNames, bars[bars.length - 1]))
-            }
-            variant="ghost"
           />
         </View>
       </View>
 
-      <View style={[styles.workspace, splitLayout && styles.workspaceSplit]}>
-        <View style={[styles.editorColumn, splitLayout && styles.editorColumnSplit]}>
+      <View style={styles.workspace}>
+        <View style={styles.editorColumn}>
           <View style={styles.rowRail}>
             {rowSlices.map((row) => {
               const lastBarNumber = row.startBarIndex + row.bars.length;
@@ -303,7 +316,14 @@ export function SectionEditorCard({
                   );
                 }
 
-                commitBars(nextBars);
+                const nextRowAnnotations = rowAnnotations.filter(
+                  (_annotation, currentIndex) => currentIndex !== row.rowIndex,
+                );
+                const nextRowBarCounts = rowBarCounts.filter(
+                  (_count, currentIndex) => currentIndex !== row.rowIndex,
+                );
+
+                commitChart(nextBars, nextRowAnnotations, nextRowBarCounts);
                 setActiveRowIndex((currentIndex) =>
                   currentIndex > row.rowIndex
                     ? currentIndex - 1
@@ -329,7 +349,7 @@ export function SectionEditorCard({
                   };
                 });
 
-                commitBars(nextBars);
+                commitChart(nextBars);
               };
               const insertRowAfter = () => {
                 let nextBars = bars;
@@ -339,9 +359,46 @@ export function SectionEditorCard({
                   nextBars = insertBar(nextBars, insertIndex + index, stringNames);
                 }
 
-                commitBars(nextBars);
+                const nextRowAnnotations = [...rowAnnotations];
+                nextRowAnnotations.splice(row.rowIndex + 1, 0, {
+                  label: '',
+                  beforeText: '',
+                  afterText: '',
+                });
+                const nextRowBarCounts = [...rowBarCounts];
+                nextRowBarCounts.splice(row.rowIndex + 1, 0, barsPerRow);
+
+                commitChart(nextBars, nextRowAnnotations, nextRowBarCounts);
               };
-              const pasteBlockAt = (insertIndex: number) => {
+              const updateRowBarCount = (value: string) => {
+                const nextCount = Math.max(1, Math.min(8, Number(value.replace(/[^0-9]/g, '')) || 1));
+
+                if (nextCount === row.barCount) {
+                  return;
+                }
+
+                let nextBars = bars;
+
+                if (nextCount > row.barCount) {
+                  for (let index = 0; index < nextCount - row.barCount; index += 1) {
+                    nextBars = insertBar(
+                      nextBars,
+                      row.startBarIndex + row.barCount + index,
+                      stringNames,
+                    );
+                  }
+                } else {
+                  for (let index = row.barCount - 1; index >= nextCount; index -= 1) {
+                    nextBars = removeBar(nextBars, row.startBarIndex + index, stringNames);
+                  }
+                }
+
+                const nextRowBarCounts = [...rowBarCounts];
+                nextRowBarCounts[row.rowIndex] = nextCount;
+
+                commitChart(nextBars, rowAnnotations, nextRowBarCounts);
+              };
+              const pasteBlockAt = (insertIndex: number, insertRowIndex: number) => {
                 if (!copiedBlock) {
                   return;
                 }
@@ -358,16 +415,15 @@ export function SectionEditorCard({
                 });
 
                 const nextAnnotations = [...rowAnnotations];
-                nextAnnotations.splice(Math.floor(insertIndex / barsPerRow), 0, {
+                nextAnnotations.splice(insertRowIndex, 0, {
                   label: copiedBlock.annotation.label,
                   beforeText: copiedBlock.annotation.beforeText,
                   afterText: copiedBlock.annotation.afterText,
                 });
+                const nextRowBarCounts = [...rowBarCounts];
+                nextRowBarCounts.splice(insertRowIndex, 0, copiedBlock.bars.length);
 
-                onChange({
-                  tab: renderTab(stringNames, nextBars),
-                  rowAnnotations: nextAnnotations,
-                });
+                commitChart(nextBars, nextAnnotations, nextRowBarCounts);
               };
 
               return (
@@ -390,6 +446,7 @@ export function SectionEditorCard({
                           stringNames={stringNames}
                           bars={row.bars}
                           rowAnnotations={[row.annotation]}
+                          rowBarCounts={[row.barCount]}
                           compact
                           style={styles.rowMiniPreview}
                         />
@@ -406,7 +463,7 @@ export function SectionEditorCard({
                         />
                         <PrimaryButton
                           label="Paste Before"
-                          onPress={() => pasteBlockAt(row.startBarIndex)}
+                          onPress={() => pasteBlockAt(row.startBarIndex, row.rowIndex)}
                           variant="ghost"
                           style={[
                             styles.sidebarButton,
@@ -416,7 +473,9 @@ export function SectionEditorCard({
                         />
                         <PrimaryButton
                           label="Paste After"
-                          onPress={() => pasteBlockAt(row.startBarIndex + row.bars.length)}
+                          onPress={() =>
+                            pasteBlockAt(row.startBarIndex + row.bars.length, row.rowIndex + 1)
+                          }
                           variant="ghost"
                           style={[
                             styles.sidebarButton,
@@ -453,12 +512,23 @@ export function SectionEditorCard({
                           size="compact"
                         />
                       </View>
-                      <Field
-                        label="Block Label"
-                        value={row.annotation.label}
-                        onChangeText={(value) => updateRowAnnotation(row.rowIndex, 'label', value)}
-                        compact
-                      />
+                      <View style={styles.rowMetaFields}>
+                        <View style={styles.rowMetaLabelField}>
+                          <Field
+                            label="Block Label"
+                            value={row.annotation.label}
+                            onChangeText={(value) => updateRowAnnotation(row.rowIndex, 'label', value)}
+                            compact
+                          />
+                        </View>
+                        <View style={styles.rowMetaCountField}>
+                          <RowBarCountField
+                            label="Bars"
+                            value={row.barCount}
+                            onCommit={updateRowBarCount}
+                          />
+                        </View>
+                      </View>
                     </View>
                   </View>
                   {activeRowIndex === row.rowIndex ? (
@@ -467,10 +537,12 @@ export function SectionEditorCard({
                       stringNames={stringNames}
                       row={row}
                       bars={bars}
+                      rowBarCounts={rowBarCounts}
                       inputRefs={inputRefs}
                       onSelectRow={setActiveRowIndex}
                       onRowAnnotationChange={updateRowAnnotation}
                       onBarsChange={commitBars}
+                      onChartChange={commitChart}
                       onCellChange={handleCellChange}
                       onCellKeyPress={handleCellKeyPress}
                     />
@@ -480,25 +552,43 @@ export function SectionEditorCard({
             })}
           </View>
         </View>
-
-        {previewVisible ? (
-          <View style={[styles.previewColumn, splitLayout && styles.previewColumnSplit]}>
-            <View style={styles.pageSheet}>
-              <View style={styles.pageMeta}>
-                <Text style={styles.pageHeading}>A4 Preview</Text>
-                <Text style={styles.pageSubheading}>Portrait print layout</Text>
-              </View>
-              <View style={styles.pageCanvas}>
-                <TabPagePreview
-                  stringNames={stringNames}
-                  bars={bars}
-                  rowAnnotations={rowAnnotations}
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
       </View>
+
+      {previewVisible ? (
+        <View style={styles.previewOverlay}>
+          <Pressable style={styles.previewBackdrop} onPress={() => setPreviewVisible(false)} />
+          <View style={styles.previewModal}>
+            <View style={styles.previewModalHeader}>
+              <View style={styles.previewModalCopy}>
+                <Text style={styles.pageHeading}>Quick Preview</Text>
+                <Text style={styles.pageSubheading}>Current A4 output</Text>
+              </View>
+              <PrimaryButton
+                label="Close"
+                onPress={() => setPreviewVisible(false)}
+                variant="secondary"
+                size="compact"
+              />
+            </View>
+            <ScrollView
+              style={styles.previewModalScroll}
+              contentContainerStyle={styles.previewModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.pageSheet}>
+                <View style={styles.pageCanvas}>
+                  <TabPagePreview
+                    stringNames={stringNames}
+                    bars={bars}
+                    rowAnnotations={rowAnnotations}
+                    rowBarCounts={rowBarCounts}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -511,8 +601,10 @@ interface RowEditorProps {
     startBarIndex: number;
     bars: ReturnType<typeof parseTab>['bars'];
     annotation: TabRowAnnotation;
+    barCount: number;
   };
   bars: ReturnType<typeof parseTab>['bars'];
+  rowBarCounts: number[];
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
   onSelectRow: (rowIndex: number) => void;
   onRowAnnotationChange: (
@@ -521,6 +613,11 @@ interface RowEditorProps {
     value: string,
   ) => void;
   onBarsChange: (bars: ReturnType<typeof parseTab>['bars']) => void;
+  onChartChange: (
+    bars: ReturnType<typeof parseTab>['bars'],
+    rowAnnotations?: TabRowAnnotation[],
+    rowBarCounts?: number[],
+  ) => void;
   onCellChange: (
     barIndex: number,
     stringName: string,
@@ -542,10 +639,12 @@ function RowEditor({
   stringNames,
   row,
   bars,
+  rowBarCounts,
   inputRefs,
   onSelectRow,
   onRowAnnotationChange,
   onBarsChange,
+  onChartChange,
   onCellChange,
   onCellKeyPress,
 }: RowEditorProps) {
@@ -598,6 +697,21 @@ function RowEditor({
       ]),
     ),
   });
+
+  const applyRowCountDelta = (
+    nextBars: ReturnType<typeof parseTab>['bars'],
+    delta: -1 | 1,
+  ) => {
+    const nextCount = Math.max(1, Math.min(8, row.barCount + delta));
+
+    if (nextCount === row.barCount) {
+      return;
+    }
+
+    const nextRowBarCounts = [...rowBarCounts];
+    nextRowBarCounts[row.rowIndex] = nextCount;
+    onChartChange(nextBars, undefined, nextRowBarCounts);
+  };
 
   return (
     <View style={styles.activeRowPanel}>
@@ -732,7 +846,10 @@ function RowEditor({
                     <PrimaryButton
                       label="Insert"
                       onPress={() =>
-                        onBarsChange(insertBar(bars, globalBarIndex, stringNames))
+                        applyRowCountDelta(
+                          insertBar(bars, globalBarIndex, stringNames),
+                          1,
+                        )
                       }
                       variant="ghost"
                       style={[styles.barFooterButton, { width: footerButtonWidth }]}
@@ -740,7 +857,10 @@ function RowEditor({
                     <PrimaryButton
                       label="Duplicate"
                       onPress={() =>
-                        onBarsChange(insertBar(bars, globalBarIndex + 1, stringNames, bar))
+                        applyRowCountDelta(
+                          insertBar(bars, globalBarIndex + 1, stringNames, bar),
+                          1,
+                        )
                       }
                       variant="ghost"
                       style={[styles.barFooterButton, { width: footerButtonWidth }]}
@@ -769,13 +889,14 @@ function RowEditor({
                       label="Paste New"
                       onPress={() =>
                         copiedBar
-                          ? onBarsChange(
+                          ? applyRowCountDelta(
                               insertBar(
                                 bars,
                                 globalBarIndex + 1,
                                 stringNames,
                                 copiedBar,
                               ),
+                              1,
                             )
                           : undefined
                       }
@@ -794,7 +915,9 @@ function RowEditor({
                     />
                     <PrimaryButton
                       label="Delete"
-                      onPress={() => onBarsChange(removeBar(bars, globalBarIndex, stringNames))}
+                      onPress={() =>
+                        applyRowCountDelta(removeBar(bars, globalBarIndex, stringNames), -1)
+                      }
                       variant="danger"
                       style={[styles.barFooterButton, { width: footerButtonWidth }]}
                     />
@@ -824,6 +947,11 @@ interface FieldProps {
   minHeight?: number;
   monospace?: boolean;
   compact?: boolean;
+  keyboardType?: 'default' | 'numeric';
+  maxLength?: number;
+  selectTextOnFocus?: boolean;
+  onBlur?: () => void;
+  onSubmitEditing?: () => void;
 }
 
 function Field({
@@ -834,6 +962,11 @@ function Field({
   minHeight = 50,
   monospace = false,
   compact = false,
+  keyboardType = 'default',
+  maxLength,
+  selectTextOnFocus = false,
+  onBlur,
+  onSubmitEditing,
 }: FieldProps) {
   return (
     <View style={[styles.field, compact && styles.compactField]}>
@@ -842,6 +975,11 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
+        selectTextOnFocus={selectTextOnFocus}
+        onBlur={onBlur}
+        onSubmitEditing={onSubmitEditing}
         textAlignVertical="top"
         style={[
           styles.input,
@@ -852,6 +990,47 @@ function Field({
         placeholderTextColor={palette.textMuted}
       />
     </View>
+  );
+}
+
+function RowBarCountField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (value: string) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(String(value));
+
+  useEffect(() => {
+    setDraftValue(String(value));
+  }, [value]);
+
+  const commitDraft = () => {
+    const digits = draftValue.replace(/[^0-9]/g, '').slice(0, 1);
+    const normalizedValue = String(Math.max(1, Math.min(8, Number(digits || value))));
+
+    setDraftValue(normalizedValue);
+
+    if (normalizedValue !== String(value)) {
+      onCommit(normalizedValue);
+    }
+  };
+
+  return (
+    <Field
+      label={label}
+      value={draftValue}
+      onChangeText={(nextValue) => setDraftValue(nextValue.replace(/[^0-9]/g, '').slice(0, 1))}
+      compact
+      keyboardType="numeric"
+      maxLength={1}
+      selectTextOnFocus
+      onBlur={commitDraft}
+      onSubmitEditing={commitDraft}
+    />
   );
 }
 
@@ -952,6 +1131,7 @@ const getCellKey = (
 
 const styles = StyleSheet.create({
   card: {
+    position: 'relative',
     backgroundColor: palette.surface,
     borderRadius: 20,
     padding: 18,
@@ -1022,21 +1202,8 @@ const styles = StyleSheet.create({
   workspace: {
     gap: 16,
   },
-  workspaceSplit: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
   editorColumn: {
     gap: 16,
-  },
-  editorColumnSplit: {
-    flex: 1.2,
-  },
-  previewColumn: {
-    gap: 16,
-  },
-  previewColumnSplit: {
-    flex: 0.9,
   },
   rowRail: {
     gap: 12,
@@ -1084,6 +1251,18 @@ const styles = StyleSheet.create({
   },
   compactField: {
     gap: 4,
+  },
+  rowMetaFields: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  rowMetaLabelField: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowMetaCountField: {
+    width: 72,
   },
   annotationHeader: {
     flexDirection: 'row',
@@ -1154,6 +1333,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: palette.text,
+  },
+  rowCountPanel: {
+    gap: 6,
+  },
+  rowCountHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: palette.textMuted,
   },
   activeRowHint: {
     fontSize: 13,
@@ -1268,6 +1455,50 @@ const styles = StyleSheet.create({
   pageSubheading: {
     fontSize: 12,
     color: '#94a3b8',
+  },
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  previewBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.52)',
+  },
+  previewModal: {
+    width: '100%',
+    maxWidth: 760,
+    maxHeight: '92%',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    padding: 16,
+    gap: 12,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  previewModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  previewModalCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  previewModalScroll: {
+    width: '100%',
+  },
+  previewModalScrollContent: {
+    alignItems: 'center',
   },
   pageCanvas: {
     width: '100%',

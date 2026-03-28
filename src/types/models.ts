@@ -4,12 +4,24 @@ export interface TabRowAnnotation {
   afterText: string;
 }
 
-export interface Section {
+export interface SongBar {
+  cells: Record<string, string[]>;
+}
+
+export interface SongRow {
   id: string;
-  name: string;
-  notes: string;
+  label: string;
+  beforeText: string;
+  afterText: string;
+  bars: SongBar[];
+}
+
+export interface SongChart {
+  id: string;
+  name?: string;
   tab: string;
-  rowAnnotations?: TabRowAnnotation[];
+  rowAnnotations: TabRowAnnotation[];
+  rowBarCounts: number[];
 }
 
 export interface Song {
@@ -20,7 +32,8 @@ export interface Song {
   feelNote: string;
   tuning: string;
   updatedAt: string;
-  sections: Section[];
+  stringNames: string[];
+  rows: SongRow[];
 }
 
 export interface SetlistSong {

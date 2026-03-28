@@ -7,7 +7,7 @@ import { palette } from '../constants/colors';
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { Song } from '../types/models';
-import { flattenSectionsToChart } from '../utils/songChart';
+import { flattenSongRowsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
 import { useWebPrintStyles } from '../utils/useWebPrintStyles';
 
@@ -118,7 +118,7 @@ export function SetlistExportScreen(_: Props) {
         </View>
 
         {orderedSongs.map((song, index) => {
-          const chart = flattenSectionsToChart(song.sections);
+          const chart = flattenSongRowsToChart(song);
           const { stringNames, bars } = parseTab(chart.tab);
 
           return (
@@ -143,7 +143,6 @@ export function SetlistExportScreen(_: Props) {
 
                 <View style={styles.metaGrid}>
                   <MetaPill label="Key" value={song.key} />
-                  <MetaPill label="Feel" value={song.feelNote} />
                   <MetaPill label="Tuning" value={song.tuning} />
                 </View>
               </View>
@@ -153,6 +152,7 @@ export function SetlistExportScreen(_: Props) {
                   stringNames={stringNames}
                   bars={bars}
                   rowAnnotations={chart.rowAnnotations ?? []}
+                  rowBarCounts={chart.rowBarCounts}
                   tone="light"
                   compact
                 />

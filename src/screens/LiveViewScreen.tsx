@@ -7,7 +7,7 @@ import { TabPagePreview } from '../components/TabPagePreview';
 import { palette } from '../constants/colors';
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
-import { flattenSectionsToChart } from '../utils/songChart';
+import { flattenSongRowsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PerformanceView'>;
@@ -17,7 +17,7 @@ export function LiveViewScreen({ route }: Props) {
   const { songs } = useBassTab();
   const song = songs.find((item) => item.id === songId);
   const chart = useMemo(
-    () => (song ? flattenSectionsToChart(song.sections) : undefined),
+    () => (song ? flattenSongRowsToChart(song) : undefined),
     [song],
   );
   const tabPreview = useMemo(() => {
@@ -32,6 +32,7 @@ export function LiveViewScreen({ route }: Props) {
         stringNames={stringNames}
         bars={bars}
         rowAnnotations={chart.rowAnnotations ?? []}
+        rowBarCounts={chart.rowBarCounts}
         tone="dark"
       />
     );
@@ -55,7 +56,7 @@ export function LiveViewScreen({ route }: Props) {
       <View style={styles.header}>
         <Text style={styles.songTitle}>{song.title}</Text>
         <Text style={styles.subtitle}>
-          {song.artist} • {song.key} • {song.feelNote} • {song.tuning}
+          {song.artist} • {song.key} • {song.tuning}
         </Text>
       </View>
 

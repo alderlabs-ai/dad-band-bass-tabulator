@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -28,108 +28,153 @@ export function SetlistScreen({ navigation }: Props) {
     [setlist.songIds, songs],
   );
 
-  const renderCard = (item: Song, isActive = false, drag?: () => void) => (
-    <Pressable
-      onLongPress={drag}
-      onPress={() => navigation.navigate('PerformanceView', { songId: item.id })}
-      style={[styles.card, isActive && styles.cardActive]}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.orderBadge}>
-          <Text style={styles.orderText}>
-            {orderedSongs.findIndex((song) => song.id === item.id) + 1}
-          </Text>
-        </View>
-        <View style={styles.copyBlock}>
-          <Text style={styles.songTitle}>{item.title}</Text>
-          <Text style={styles.artistText}>{item.artist}</Text>
-        </View>
-      </View>
-
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>{item.key}</Text>
-        <Text style={styles.metaText}>{item.feelNote}</Text>
-          <Text style={styles.metaText}>Chart ready</Text>
-      </View>
-
-      <Text style={styles.hint}>
-        {Platform.OS === 'web'
-          ? 'Tap to open performance view.'
-          : 'Tap to open performance view. Long press to reorder.'}
-      </Text>
-    </Pressable>
+  const availableSongs = useMemo(
+    () => songs.filter((song) => !setlist.songIds.includes(song.id)),
+    [setlist.songIds, songs],
   );
 
-  const renderNativeList = () => {
-    const { default: DraggableFlatList, ScaleDecorator } = require(
-      'react-native-draggable-flatlist'
-    );
+  const moveSong = (songId: string, direction: -1 | 1) => {
+    const index = setlist.songIds.findIndex((id) => id === songId);
+    const nextIndex = index + direction;
 
-    return (
-      <DraggableFlatList
-        data={orderedSongs}
-        keyExtractor={(item: Song) => item.id}
-        onDragEnd={({ data }: { data: Song[] }) =>
-          reorderSetlist(data.map((song) => song.id))
-        }
-        renderItem={({
-          item,
-          drag,
-          isActive,
-        }: {
-          item: Song;
-          drag: () => void;
-          isActive: boolean;
-        }) => <ScaleDecorator>{renderCard(item, isActive, drag)}</ScaleDecorator>}
-        contentContainerStyle={styles.listContent}
-        activationDistance={8}
-      />
-    );
+    if (index < 0 || nextIndex < 0 || nextIndex >= setlist.songIds.length) {
+      return;
+    }
+
+    const nextSongIds = [...setlist.songIds];
+    const [movedSongId] = nextSongIds.splice(index, 1);
+    nextSongIds.splice(nextIndex, 0, movedSongId);
+    reorderSetlist(nextSongIds);
+  };
+
+  const removeSong = (songId: string) => {
+    reorderSetlist(setlist.songIds.filter((id) => id !== songId));
+  };
+
+  const addSong = (songId: string) => {
+    reorderSetlist([...setlist.songIds, songId]);
   };
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>{setlist.name}</Text>
-        <Text style={styles.subtitle}>
-          Drag songs into performance order for rehearsal or gigs.
-        </Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>{setlist.name}</Text>
+          <Text style={styles.subtitle}>
+            Build the running order, move songs up or down, and remove them when they are out.
+          </Text>
+        </View>
         {orderedSongs.length > 0 ? (
           <PrimaryButton
-            label="Export Setlist PDF"
+            label="Export Multi-Page PDF"
             onPress={() => navigation.navigate('ExportSetlist')}
             variant="ghost"
           />
         ) : null}
       </View>
 
-      {orderedSongs.length === 0 ? (
-        <EmptyState
-          title="Setlist is empty"
-          description="Add a song from the library to build the running order."
-        />
-      ) : (
-        Platform.OS === 'web' ? (
-          <FlatList
-            data={orderedSongs}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderCard(item)}
-            contentContainerStyle={styles.listContent}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Current Order</Text>
+        <Text style={styles.sectionSubtitle}>
+          Songs in the performance sequence.
+        </Text>
+
+        {orderedSongs.length === 0 ? (
+          <EmptyState
+            title="Setlist is empty"
+            description="Add a song from the library section below."
           />
         ) : (
-          renderNativeList()
-        )
-      )}
+          orderedSongs.map((song, index) => (
+            <View key={song.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.orderBadge}>
+                  <Text style={styles.orderText}>{index + 1}</Text>
+                </View>
+                <View style={styles.copyBlock}>
+                  <Text style={styles.songTitle}>{song.title}</Text>
+                  <Text style={styles.artistText}>{song.artist}</Text>
+                </View>
+              </View>
+
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText}>{song.key}</Text>
+                <Text style={styles.metaText}>{song.tuning}</Text>
+              </View>
+
+              <View style={styles.actions}>
+                <PrimaryButton
+                  label="Open"
+                  onPress={() => navigation.navigate('PerformanceView', { songId: song.id })}
+                  variant="ghost"
+                  size="compact"
+                />
+                <PrimaryButton
+                  label="Up"
+                  onPress={() => moveSong(song.id, -1)}
+                  variant="secondary"
+                  size="compact"
+                />
+                <PrimaryButton
+                  label="Down"
+                  onPress={() => moveSong(song.id, 1)}
+                  variant="secondary"
+                  size="compact"
+                />
+                <PrimaryButton
+                  label="Remove"
+                  onPress={() => removeSong(song.id)}
+                  variant="danger"
+                  size="compact"
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Add From Library</Text>
+        <Text style={styles.sectionSubtitle}>
+          Songs available to add to the setlist.
+        </Text>
+
+        {availableSongs.length === 0 ? (
+          <EmptyState
+            title="No more songs to add"
+            description="Every library song is already in the setlist."
+          />
+        ) : (
+          availableSongs.map((song) => (
+            <View key={song.id} style={styles.libraryCard}>
+              <View style={styles.libraryCopy}>
+                <Text style={styles.libraryTitle}>{song.title}</Text>
+                <Text style={styles.libraryMeta}>
+                  {song.artist} • {song.key} • {song.tuning}
+                </Text>
+              </View>
+              <PrimaryButton
+                label="Add"
+                onPress={() => addSong(song.id)}
+                size="compact"
+              />
+            </View>
+          ))
+        )}
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    gap: 16,
+  content: {
+    gap: 20,
+    paddingBottom: 28,
   },
   header: {
+    gap: 12,
+  },
+  headerCopy: {
     gap: 6,
   },
   title: {
@@ -139,12 +184,21 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    lineHeight: 24,
     color: palette.textMuted,
-    lineHeight: 22,
   },
-  listContent: {
-    paddingBottom: 24,
-    gap: 14,
+  section: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: palette.text,
+  },
+  sectionSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textMuted,
   },
   card: {
     backgroundColor: palette.surface,
@@ -152,15 +206,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: palette.border,
-    gap: 12,
-  },
-  cardActive: {
-    borderColor: palette.primary,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    gap: 14,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -202,9 +248,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: palette.textMuted,
   },
-  hint: {
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  libraryCard: {
+    backgroundColor: palette.card,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  libraryCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  libraryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  libraryMeta: {
     fontSize: 14,
-    color: palette.primary,
-    fontWeight: '600',
+    lineHeight: 20,
+    color: palette.textMuted,
   },
 });

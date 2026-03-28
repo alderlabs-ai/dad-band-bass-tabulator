@@ -10,8 +10,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { tuningOptions } from '../constants/tunings';
 import { seededSetlist, seededSongs } from '../data/seed';
-import { Section, Setlist, Song } from '../types/models';
+import { Song, SongChart, SongRow, Setlist } from '../types/models';
 import { createId } from '../utils/ids';
+import { loadSnapshotFile, saveSnapshotFile, stateStorageLabel } from '../utils/stateSnapshot';
+import { mergeChartIntoSongRows } from '../utils/songChart';
+import { parseTab } from '../utils/tabLayout';
 
 interface SongInput {
   title?: string;
@@ -21,34 +24,167 @@ interface SongInput {
   tuning?: string;
 }
 
+interface LegacySection {
+  id: string;
+  name: string;
+  notes?: string;
+  tab: string;
+  rowAnnotations?: Array<{
+    label: string;
+    beforeText: string;
+    afterText: string;
+  }>;
+  rowBarCounts?: number[];
+}
+
+interface LegacySong {
+  id: string;
+  title: string;
+  artist: string;
+  key: string;
+  feelNote: string;
+  tuning: string;
+  updatedAt: string;
+  sections?: LegacySection[];
+}
+
+interface BassTabSnapshot {
+  version: 1;
+  exportedAt: string;
+  songs: Array<Song | LegacySong>;
+  setlist: Setlist;
+}
+
 interface BassTabContextValue {
   songs: Song[];
   setlist: Setlist;
+  storageFileUri: string;
   createSong: (input?: SongInput) => Song;
+  deleteSong: (songId: string) => void;
   updateSong: (songId: string, updates: Partial<Song>) => void;
-  addSection: (songId: string) => void;
-  updateSection: (
-    songId: string,
-    sectionId: string,
-    updates: Partial<Section>,
-  ) => void;
-  deleteSection: (songId: string, sectionId: string) => void;
-  moveSection: (songId: string, sectionId: string, direction: -1 | 1) => void;
+  updateSongChart: (songId: string, chart: Pick<SongChart, 'tab' | 'rowAnnotations' | 'rowBarCounts'>) => void;
   reorderSetlist: (songIds: string[]) => void;
+  saveStateToFile: () => Promise<string>;
+  loadStateFromFile: () => Promise<string>;
 }
 
 const BassTabContext = createContext<BassTabContextValue | undefined>(undefined);
 
-const defaultSectionNames = ['Intro', 'Verse', 'Chorus', 'Bridge', 'Outro'];
 const storageKeys = {
   songs: 'basstab:songs',
   setlist: 'basstab:setlist',
 };
 
+const createEmptyRow = (label = 'Intro'): SongRow => ({
+  id: createId('row'),
+  label,
+  beforeText: '',
+  afterText: '',
+  bars: Array.from({ length: 4 }, () => ({
+    cells: {
+      G: Array.from({ length: 8 }, () => '-'),
+      D: Array.from({ length: 8 }, () => '-'),
+      A: Array.from({ length: 8 }, () => '-'),
+      E: Array.from({ length: 8 }, () => '-'),
+    },
+  })),
+});
+
 const updateTimestamp = (song: Song): Song => ({
   ...song,
   updatedAt: new Date().toISOString(),
 });
+
+const isSetlist = (value: unknown): value is Setlist => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<Setlist>;
+
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.updatedAt === 'string' &&
+    Array.isArray(candidate.songIds) &&
+    candidate.songIds.every((songId) => typeof songId === 'string')
+  );
+};
+
+const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
+  if ('rows' in legacySong && Array.isArray(legacySong.rows)) {
+    return legacySong as Song;
+  }
+
+  const legacySections = (legacySong as LegacySong).sections ?? [];
+
+  if (legacySections.length === 0) {
+    return {
+      id: legacySong.id,
+      title: legacySong.title,
+      artist: legacySong.artist,
+      key: legacySong.key,
+      feelNote: legacySong.feelNote,
+      tuning: legacySong.tuning,
+      updatedAt: legacySong.updatedAt,
+      stringNames: ['G', 'D', 'A', 'E'],
+      rows: [createEmptyRow()],
+    };
+  }
+
+  const stringNames = parseTab(legacySections[0].tab).stringNames;
+  const rows = legacySections.map((section: LegacySection) => {
+    const chart = mergeChartIntoSongRows(
+      { stringNames, rows: [] },
+      {
+        tab: section.tab,
+        rowAnnotations:
+          section.rowAnnotations?.map((annotation, rowIndex: number) =>
+            rowIndex === 0
+              ? { ...annotation, label: annotation.label || section.name }
+              : annotation,
+          ) ?? [{ label: section.name, beforeText: '', afterText: '' }],
+        rowBarCounts: section.rowBarCounts ?? [],
+      },
+    );
+
+    return chart.rows.map((row, index) => ({
+      ...row,
+      id: index === 0 ? section.id : createId('row'),
+    }));
+  }).flat();
+
+  return {
+    id: legacySong.id,
+    title: legacySong.title,
+    artist: legacySong.artist,
+    key: legacySong.key,
+    feelNote: legacySong.feelNote,
+    tuning: legacySong.tuning,
+    updatedAt: legacySong.updatedAt,
+    stringNames,
+    rows,
+  };
+};
+
+const parseSnapshot = (rawSnapshot: string): { songs: Song[]; setlist: Setlist } => {
+  const parsed = JSON.parse(rawSnapshot) as Partial<BassTabSnapshot>;
+
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.songs) || !isSetlist(parsed.setlist)) {
+    throw new Error('Snapshot is not a valid BassTab JSON file.');
+  }
+
+  const songs = parsed.songs.map(migrateLegacySong);
+  const knownSongIds = new Set(songs.map((song) => song.id));
+
+  return {
+    songs,
+    setlist: {
+      ...parsed.setlist,
+      songIds: parsed.setlist.songIds.filter((songId) => knownSongIds.has(songId)),
+    },
+  };
+};
 
 export function BassTabProvider({ children }: PropsWithChildren) {
   const [songs, setSongs] = useState<Song[]>(seededSongs);
@@ -68,7 +204,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           AsyncStorage.getItem(storageKeys.setlist),
         ]);
 
-        const parsedSongs = storedSongs ? (JSON.parse(storedSongs) as Song[]) : null;
+        const parsedSongs = storedSongs ? (JSON.parse(storedSongs) as Array<Song | LegacySong>) : null;
         const parsedSetlist = storedSetlist ? (JSON.parse(storedSetlist) as Setlist) : null;
 
         if (!isMounted) {
@@ -76,7 +212,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         }
 
         if (parsedSongs && Array.isArray(parsedSongs)) {
-          setSongs(parsedSongs);
+          setSongs(parsedSongs.map(migrateLegacySong));
         }
 
         if (parsedSetlist) {
@@ -126,24 +262,22 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       feelNote: input?.feelNote ?? 'Mid-tempo pocket',
       tuning: input?.tuning ?? tuningOptions[0],
       updatedAt: new Date().toISOString(),
-      sections: [
-        {
-          id: createId('section'),
-          name: 'Intro',
-          notes: 'Add groove notes here.',
-          tab: 'G|----------------|\nD|----------------|\nA|----------------|\nE|----------------|',
-        },
-      ],
+      stringNames: ['G', 'D', 'A', 'E'],
+      rows: [createEmptyRow('Intro')],
     };
 
     setSongs((current) => [newSong, ...current]);
-    setSetlist((current) => ({
-      ...current,
-      songIds: [...current.songIds, newSong.id],
-      updatedAt: new Date().toISOString(),
-    }));
 
     return newSong;
+  };
+
+  const deleteSong = (songId: string) => {
+    setSongs((current) => current.filter((song) => song.id !== songId));
+    setSetlist((current) => ({
+      ...current,
+      songIds: current.songIds.filter((id) => id !== songId),
+      updatedAt: new Date().toISOString(),
+    }));
   };
 
   const updateSong = (songId: string, updates: Partial<Song>) => {
@@ -154,37 +288,9 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     );
   };
 
-  const addSection = (songId: string) => {
-    setSongs((current) =>
-      current.map((song) => {
-        if (song.id !== songId) {
-          return song;
-        }
-
-        const nextName =
-          defaultSectionNames[song.sections.length] ??
-          `Section ${song.sections.length + 1}`;
-
-        return updateTimestamp({
-          ...song,
-          sections: [
-            ...song.sections,
-            {
-              id: createId('section'),
-              name: nextName,
-              notes: '',
-              tab: 'G|----------------|\nD|----------------|\nA|----------------|\nE|----------------|',
-            },
-          ],
-        });
-      }),
-    );
-  };
-
-  const updateSection = (
+  const updateSongChart = (
     songId: string,
-    sectionId: string,
-    updates: Partial<Section>,
+    chart: Pick<SongChart, 'tab' | 'rowAnnotations' | 'rowBarCounts'>,
   ) => {
     setSongs((current) =>
       current.map((song) => {
@@ -192,52 +298,10 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           return song;
         }
 
+        const nextSongShape = mergeChartIntoSongRows(song, chart);
         return updateTimestamp({
           ...song,
-          sections: song.sections.map((section) =>
-            section.id === sectionId ? { ...section, ...updates } : section,
-          ),
-        });
-      }),
-    );
-  };
-
-  const deleteSection = (songId: string, sectionId: string) => {
-    setSongs((current) =>
-      current.map((song) => {
-        if (song.id !== songId || song.sections.length === 1) {
-          return song;
-        }
-
-        return updateTimestamp({
-          ...song,
-          sections: song.sections.filter((section) => section.id !== sectionId),
-        });
-      }),
-    );
-  };
-
-  const moveSection = (songId: string, sectionId: string, direction: -1 | 1) => {
-    setSongs((current) =>
-      current.map((song) => {
-        if (song.id !== songId) {
-          return song;
-        }
-
-        const index = song.sections.findIndex((section) => section.id === sectionId);
-        const nextIndex = index + direction;
-
-        if (index < 0 || nextIndex < 0 || nextIndex >= song.sections.length) {
-          return song;
-        }
-
-        const nextSections = [...song.sections];
-        const [moved] = nextSections.splice(index, 1);
-        nextSections.splice(nextIndex, 0, moved);
-
-        return updateTimestamp({
-          ...song,
-          sections: nextSections,
+          ...nextSongShape,
         });
       }),
     );
@@ -251,17 +315,38 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     }));
   };
 
+  const saveStateToFile = async () => {
+    const snapshot: BassTabSnapshot = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      songs,
+      setlist,
+    };
+
+    return saveSnapshotFile(snapshot);
+  };
+
+  const loadStateFromFile = async () => {
+    const nextState = parseSnapshot(await loadSnapshotFile());
+
+    setSongs(nextState.songs);
+    setSetlist(nextState.setlist);
+
+    return stateStorageLabel;
+  };
+
   const value = useMemo(
     () => ({
       songs,
       setlist,
+      storageFileUri: stateStorageLabel,
       createSong,
+      deleteSong,
       updateSong,
-      addSection,
-      updateSection,
-      deleteSection,
-      moveSection,
+      updateSongChart,
       reorderSetlist,
+      saveStateToFile,
+      loadStateFromFile,
     }),
     [setlist, songs],
   );

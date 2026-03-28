@@ -9,38 +9,42 @@ interface LibrarySongCardProps {
   song: Song;
   onEdit: () => void;
   onLive: () => void;
+  onDelete: () => void;
 }
 
 export function LibrarySongCard({
   song,
   onEdit,
   onLive,
+  onDelete,
 }: LibrarySongCardProps) {
   return (
-    <Pressable onPress={onEdit} style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>{song.title}</Text>
-          <Text style={styles.artist}>{song.artist}</Text>
+    <View style={styles.card}>
+      <Pressable onPress={onEdit} style={({ pressed }) => [styles.summary, pressed && styles.pressed]}>
+        <View style={styles.header}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>{song.title}</Text>
+            <Text style={styles.artist}>{song.artist}</Text>
+          </View>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{song.key}</Text>
+          </View>
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{song.key}</Text>
-        </View>
-      </View>
 
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>{song.feelNote}</Text>
-        <Text style={styles.metaText}>{song.tuning}</Text>
-      </View>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>{song.tuning}</Text>
+        </View>
+      </Pressable>
 
       <View style={styles.footer}>
         <Text style={styles.updated}>Updated {formatUpdatedAt(song.updatedAt)}</Text>
         <View style={styles.actions}>
           <PrimaryButton label="Edit" onPress={onEdit} variant="ghost" />
           <PrimaryButton label="Perform" onPress={onLive} variant="secondary" />
+          <PrimaryButton label="Delete" onPress={onDelete} variant="danger" />
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -51,6 +55,9 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: palette.border,
+    gap: 14,
+  },
+  summary: {
     gap: 14,
   },
   header: {
@@ -102,6 +109,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

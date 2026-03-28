@@ -1,140 +1,94 @@
-import { Section, TabRowAnnotation } from '../types/models';
-import { ParsedBar, getRowCount, parseTab, renderTab } from './tabLayout';
+import { createId } from './ids';
+import { parseTab, renderTab } from './tabLayout';
+import { Song, SongChart, SongRow, TabRowAnnotation } from '../types/models';
 
-const barsPerRow = 4;
+const defaultBarsPerRow = 4;
+const maxBarsPerRow = 8;
 
-const cloneAnnotation = (annotation?: TabRowAnnotation): TabRowAnnotation => ({
+const cloneAnnotation = (annotation?: Partial<TabRowAnnotation>): TabRowAnnotation => ({
   label: annotation?.label ?? '',
   beforeText: annotation?.beforeText ?? '',
   afterText: annotation?.afterText ?? '',
 });
 
-const getSectionBars = (section: Section) =>
-  section.tab.trim() ? parseTab(section.tab).bars : [];
-
-const getSectionBarCounts = (sections: Section[]) =>
-  sections.map((section) => getSectionBars(section).length);
-
-const rebalanceSectionBarCounts = (counts: number[], targetTotalBars: number) => {
-  const nextCounts = [...counts];
-  const currentTotalBars = counts.reduce((total, count) => total + count, 0);
-  let delta = targetTotalBars - currentTotalBars;
-
-  if (delta > 0) {
-    nextCounts[nextCounts.length - 1] += delta;
-    return nextCounts;
+export const normalizeRowBarCounts = (
+  totalBars: number,
+  rowBarCounts?: number[],
+): number[] => {
+  if (totalBars <= 0) {
+    return [];
   }
 
-  for (let index = nextCounts.length - 1; index >= 0 && delta < 0; index -= 1) {
-    const removable = Math.min(nextCounts[index], Math.abs(delta));
-    nextCounts[index] -= removable;
-    delta += removable;
-  }
+  const counts: number[] = [];
+  let consumedBars = 0;
 
-  return nextCounts;
-};
-
-export const flattenSectionsToChart = (sections: Section[]): Section => {
-  // The editor works on one continuous chart even though songs are stored as sections.
-  // This function is intentionally display-oriented: it merges section tabs and row
-  // annotations into one synthetic chart for the editing UI.
-  const sourceSections =
-    sections.length > 0
-      ? sections
-      : [
-          {
-            id: 'chart',
-            name: 'Chart',
-            notes: '',
-            tab: '',
-            rowAnnotations: [],
-          },
-        ];
-
-  let stringNames: string[] | null = null;
-  const bars: ParsedBar[] = [];
-  const rowAnnotations: TabRowAnnotation[] = [];
-
-  sourceSections.forEach((section, sectionIndex) => {
-    const parsed = parseTab(section.tab);
-
-    if (!stringNames) {
-      stringNames = parsed.stringNames;
+  (rowBarCounts ?? []).forEach((count) => {
+    if (consumedBars >= totalBars) {
+      return;
     }
 
-    bars.push(...parsed.bars);
-
-    const sectionRowCount = getRowCount(parsed.bars, barsPerRow);
-
-    for (let rowIndex = 0; rowIndex < sectionRowCount; rowIndex += 1) {
-      const existing = cloneAnnotation(section.rowAnnotations?.[rowIndex]);
-
-      if (rowIndex === 0 && !existing.label.trim()) {
-        existing.label = section.name || `Block ${sectionIndex + 1}`;
-      }
-
-      rowAnnotations.push(existing);
-    }
+    const safeCount = Math.max(1, Math.min(maxBarsPerRow, Math.floor(count || 0)));
+    const nextCount = Math.min(safeCount, totalBars - consumedBars);
+    counts.push(nextCount);
+    consumedBars += nextCount;
   });
 
-  const resolvedStringNames = stringNames ?? ['G', 'D', 'A', 'E'];
+  while (consumedBars < totalBars) {
+    const nextCount = Math.min(defaultBarsPerRow, totalBars - consumedBars);
+    counts.push(nextCount);
+    consumedBars += nextCount;
+  }
+
+  return counts;
+};
+
+export const flattenSongRowsToChart = (song: Pick<Song, 'stringNames' | 'rows'>): SongChart => {
+  const bars = song.rows.flatMap((row) => row.bars);
 
   return {
-    id: sourceSections[0].id,
-    name: 'Chart',
-    notes: '',
-    tab: renderTab(resolvedStringNames, bars),
-    rowAnnotations,
+    id: 'chart',
+    tab: renderTab(song.stringNames, bars),
+    rowAnnotations: song.rows.map((row) =>
+      cloneAnnotation({
+        label: row.label,
+        beforeText: row.beforeText,
+        afterText: row.afterText,
+      }),
+    ),
+    rowBarCounts: song.rows.map((row) => row.bars.length),
   };
 };
 
-export const mergeChartIntoSections = (
-  sourceSections: Section[],
-  editedChart: Pick<Section, 'tab' | 'rowAnnotations'>,
-): Section[] => {
-  // This is the inverse seam of flattenSectionsToChart(...). The editor stays flattened,
-  // but persisted song data must remain section-based so section ids, notes, and future
-  // backend semantics survive edits.
-  if (sourceSections.length === 0) {
-    return [
-      {
-        id: 'chart',
-        name: 'Chart',
-        notes: '',
-        tab: editedChart.tab,
-        rowAnnotations: editedChart.rowAnnotations ?? [],
-      },
-    ];
-  }
-
-  const { stringNames, bars } = parseTab(editedChart.tab);
-  const nextSectionBarCounts = rebalanceSectionBarCounts(
-    getSectionBarCounts(sourceSections),
-    bars.length,
-  );
-  const nextRowAnnotations = editedChart.rowAnnotations ?? [];
+export const mergeChartIntoSongRows = (
+  sourceSong: Pick<Song, 'stringNames' | 'rows'>,
+  editedChart: Pick<SongChart, 'tab' | 'rowAnnotations' | 'rowBarCounts'>,
+): Pick<Song, 'stringNames' | 'rows'> => {
+  const parsed = parseTab(editedChart.tab);
+  const stringNames =
+    parsed.stringNames.length > 0 ? parsed.stringNames : sourceSong.stringNames;
+  const rowBarCounts = normalizeRowBarCounts(parsed.bars.length, editedChart.rowBarCounts);
+  const rowAnnotations = editedChart.rowAnnotations ?? [];
 
   let barCursor = 0;
-  let rowCursor = 0;
 
-  return sourceSections.map((section, sectionIndex) => {
-    const barCount = nextSectionBarCounts[sectionIndex] ?? 0;
-    const sectionBars = bars.slice(barCursor, barCursor + barCount);
-    const sectionRowCount = barCount > 0 ? getRowCount(sectionBars, barsPerRow) : 0;
-    const sectionAnnotations = nextRowAnnotations
-      .slice(rowCursor, rowCursor + sectionRowCount)
-      .map(cloneAnnotation);
-    const nextName =
-      sectionAnnotations[0]?.label?.trim() || section.name || `Block ${sectionIndex + 1}`;
+  const rows: SongRow[] = rowBarCounts.map((barCount, rowIndex) => {
+    const sourceRow = sourceSong.rows[rowIndex];
+    const annotation = cloneAnnotation(rowAnnotations[rowIndex]);
+    const nextRowBars = parsed.bars.slice(barCursor, barCursor + barCount);
 
     barCursor += barCount;
-    rowCursor += sectionRowCount;
 
     return {
-      ...section,
-      name: nextName,
-      tab: sectionBars.length > 0 ? renderTab(stringNames, sectionBars) : '',
-      rowAnnotations: sectionAnnotations,
+      id: sourceRow?.id ?? createId('row'),
+      label: annotation.label.trim(),
+      beforeText: annotation.beforeText,
+      afterText: annotation.afterText,
+      bars: nextRowBars,
     };
   });
+
+  return {
+    stringNames,
+    rows,
+  };
 };

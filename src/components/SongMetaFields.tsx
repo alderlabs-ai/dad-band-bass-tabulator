@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { palette } from '../constants/colors';
-import { feelStyleSuggestions } from '../constants/feelStyles';
 import { tuningOptions } from '../constants/tunings';
 import { Song } from '../types/models';
 
@@ -34,12 +33,6 @@ export function SongMetaFields({ song, onFieldChange }: SongMetaFieldsProps) {
           compact
         />
         <Field
-          label="Feel / Style"
-          value={song.feelNote}
-          onChangeText={(value) => onFieldChange('feelNote', value)}
-          suggestions={feelStyleSuggestions as unknown as string[]}
-        />
-        <Field
           label="Tuning"
           value={song.tuning}
           onChangeText={(value) => onFieldChange('tuning', value)}
@@ -57,7 +50,6 @@ interface FieldProps {
   compact?: boolean;
   keyboardType?: 'default' | 'numeric';
   options?: string[];
-  suggestions?: string[];
 }
 
 function Field({
@@ -67,7 +59,6 @@ function Field({
   compact = false,
   keyboardType = 'default',
   options,
-  suggestions,
 }: FieldProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -128,30 +119,6 @@ function Field({
         style={styles.input}
         placeholderTextColor={palette.textMuted}
       />
-      {suggestions?.length ? (
-        <View style={styles.suggestionRow}>
-          {suggestions.map((suggestion) => (
-            <Pressable
-              key={suggestion}
-              onPress={() => onChangeText(suggestion)}
-              style={({ pressed }) => [
-                styles.suggestionChip,
-                value === suggestion && styles.suggestionChipActive,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.suggestionChipText,
-                  value === suggestion && styles.suggestionChipTextActive,
-                ]}
-              >
-                {suggestion}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -245,28 +212,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
-  },
-  suggestionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    paddingTop: 2,
-  },
-  suggestionChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: palette.surfaceMuted,
-  },
-  suggestionChipActive: {
-    backgroundColor: palette.primaryMuted,
-  },
-  suggestionChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: palette.textMuted,
-  },
-  suggestionChipTextActive: {
-    color: palette.primary,
   },
 });
