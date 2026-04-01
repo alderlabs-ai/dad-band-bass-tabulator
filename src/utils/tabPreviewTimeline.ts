@@ -1,0 +1,90 @@
+import type { ParsedBar } from './tabLayout.ts';
+import { SLOTS_PER_BAR, EMPTY_SLOT } from './tabLayout.ts';
+
+export type NoteRenderStyle = 'short' | 'beat' | 'hold2' | 'hold4';
+
+export const isEmptySlotValue = (value: string): boolean => {
+  const trimmed = value.trim();
+  return trimmed === '' || trimmed === EMPTY_SLOT || /^-+$/.test(trimmed);
+};
+
+const mapEmptyCountToStyle = (emptyCount: number): NoteRenderStyle => {
+  if (emptyCount === 0) {
+    return 'short';
+  }
+
+  if (emptyCount === 1) {
+    return 'beat';
+  }
+
+  if (emptyCount === 2) {
+    return 'hold2';
+  }
+
+  return 'hold4';
+};
+
+const hasNoteAtSlotOnString = (
+  rowBars: ParsedBar[],
+  stringName: string,
+  absoluteSlotIndex: number,
+): boolean => {
+  const barIndex = Math.floor(absoluteSlotIndex / SLOTS_PER_BAR);
+  const slotIndex = absoluteSlotIndex % SLOTS_PER_BAR;
+  const bar = rowBars[barIndex];
+
+  if (!bar) {
+    return false;
+  }
+
+  const value = bar.cells[stringName]?.[slotIndex];
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return !isEmptySlotValue(value);
+};
+
+const computeEmptySlotsOnString = (
+  rowBars: ParsedBar[],
+  stringName: string,
+  absoluteSlotIndex: number,
+): number => {
+  const totalSlots = rowBars.length * SLOTS_PER_BAR;
+  let lookahead = absoluteSlotIndex + 1;
+  let emptyCount = 0;
+
+  while (lookahead < totalSlots) {
+    if (hasNoteAtSlotOnString(rowBars, stringName, lookahead)) {
+      break;
+    }
+
+    emptyCount += 1;
+    lookahead += 1;
+  }
+
+  return emptyCount;
+};
+
+export const getNoteRenderStyle = ({
+  rowBars,
+  stringName,
+  barIndex,
+  slotIndex,
+}: {
+  rowBars: ParsedBar[];
+  stringName: string;
+  barIndex: number;
+  slotIndex: number;
+}): NoteRenderStyle => {
+  const absoluteSlotIndex = barIndex * SLOTS_PER_BAR + slotIndex;
+
+  if (!hasNoteAtSlotOnString(rowBars, stringName, absoluteSlotIndex)) {
+    return 'short';
+  }
+
+  const emptyCount = computeEmptySlotsOnString(rowBars, stringName, absoluteSlotIndex);
+
+  return mapEmptyCountToStyle(emptyCount);
+};

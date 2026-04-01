@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "export:web": "expo export --platform web",
-    "verify:linux": "npm run typecheck && npm run export:web"
+    "verify:linux": "npm run typecheck && npm run export:web",
+    "test:note-style": "node -r ts-node/register tests/noteRenderStyle.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -28,11 +29,14 @@
     "react-native-reanimated": "4.2.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
+    "react-native-svg": "^15.15.4",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@types/node": "^22.5.2",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^55.0.12",
+    "ts-node": "^10.9.1",
     "typescript": "~5.9.2"
   },
   "private": true

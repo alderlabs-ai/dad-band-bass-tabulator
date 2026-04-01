@@ -24,7 +24,7 @@ import {
   updateBarCell,
 } from '../utils/tabLayout';
 import { PrimaryButton } from './PrimaryButton';
-import { TabPagePreview } from './TabPagePreview';
+import { TabPagePreview, TabPreviewRenderMode } from './TabPagePreview';
 
 interface SectionEditorCardProps {
   section: SongChart;
@@ -43,6 +43,7 @@ const mobileBeatLabels = ['1', '1&', '2', '2&', '3', '3&', '4', '4&'];
 const barsPerRow = 4;
 const baseFretOptions = Array.from({ length: 12 }, (_value, index) => String(index + 1));
 const extendedFretOptions = ['13', '14', '15', '16', '17', '18', '19', '/', '\\'];
+const PREVIEW_RENDER_MODES: TabPreviewRenderMode[] = ['ascii', 'svg'];
 
 const parseAnnotationControls = (value: string) => {
   const alignMatch = value.trim().match(/^\[(left|center|right)\]\s*/i);
@@ -107,6 +108,7 @@ export function SectionEditorCard({
     bars: ReturnType<typeof parseTab>['bars'];
     annotation: TabRowAnnotation;
   } | null>(null);
+  const [renderMode, setRenderMode] = useState<TabPreviewRenderMode>('ascii');
   const inputRefs = useRef<Record<string, TextInput | null>>({});
 
   const { stringNames, bars } = useMemo(() => parseTab(section.tab), [section.tab]);
@@ -280,6 +282,30 @@ export function SectionEditorCard({
           </View>
         ) : null}
         <View style={styles.toolbarActions}>
+          <View style={styles.renderModeControl}>
+            <Text style={styles.renderModeLabel}>Preview mode</Text>
+            <View style={styles.renderModeSelector}>
+              {PREVIEW_RENDER_MODES.map((mode) => (
+                <Pressable
+                  key={mode}
+                  onPress={() => setRenderMode(mode)}
+                  style={[
+                    styles.renderModeOption,
+                    renderMode === mode && styles.renderModeOptionActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.renderModeOptionText,
+                      renderMode === mode && styles.renderModeOptionTextActive,
+                    ]}
+                  >
+                    {mode.toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
           <PrimaryButton
             label="Quick Preview"
             onPress={() => setPreviewVisible((value) => !value)}
@@ -461,6 +487,7 @@ export function SectionEditorCard({
                               rowAnnotations={[row.annotation]}
                               rowBarCounts={[row.barCount]}
                               compact
+                              renderMode={renderMode}
                               style={styles.rowMiniPreview}
                             />
                           </ScrollView>
@@ -471,6 +498,7 @@ export function SectionEditorCard({
                             rowAnnotations={[row.annotation]}
                             rowBarCounts={[row.barCount]}
                             compact
+                            renderMode={renderMode}
                             style={styles.rowMiniPreview}
                           />
                         )
@@ -642,6 +670,7 @@ export function SectionEditorCard({
                       rowAnnotations={rowAnnotations}
                       rowBarCounts={rowBarCounts}
                       compact={isPreviewCompact}
+                      renderMode={renderMode}
                     />
                   </View>
                 </ScrollView>
@@ -1593,6 +1622,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  renderModeControl: {
+    gap: 4,
+  },
+  renderModeLabel: {
+    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    color: palette.textMuted,
+  },
+  renderModeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  renderModeOption: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
+  },
+  renderModeOptionActive: {
+    borderColor: palette.primary,
+    backgroundColor: palette.primaryMuted,
+  },
+  renderModeOptionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: palette.textMuted,
+  },
+  renderModeOptionTextActive: {
+    color: palette.primary,
   },
   workspace: {
     gap: 16,

@@ -1,7 +1,7 @@
 const DEFAULT_STRING_NAMES = ['G', 'D', 'A', 'E'];
-const SLOTS_PER_BAR = 8;
+export const SLOTS_PER_BAR = 8;
 const CHARS_PER_SLOT = 2;
-const EMPTY_SLOT = '-';
+export const EMPTY_SLOT = '-';
 const BARS_PER_ROW = 4;
 
 export interface ParsedBar {
