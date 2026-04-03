@@ -8,6 +8,7 @@ import {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { createBassTabApiFromEnv, fromPlaylistDto, fromSongDto } from '../api';
 import { FREE_SETLIST_TITLE } from '../constants/setlist';
 import { tuningOptions } from '../constants/tunings';
 import { seededSetlist, seededSongs } from '../data/seed';
@@ -60,7 +61,7 @@ interface BassTabContextValue {
   songs: Song[];
   setlist: Setlist;
   storageFileUri: string;
-  createSong: (input?: SongInput) => Song;
+  createSong: (input?: SongInput) => Promise<Song>;
   deleteSong: (songId: string) => void;
   updateSong: (songId: string, updates: Partial<Song>) => void;
   updateSongChart: (songId: string, chart: Pick<SongChart, 'tab' | 'rowAnnotations' | 'rowBarCounts'>) => void;
@@ -196,14 +197,53 @@ export function BassTabProvider({ children }: PropsWithChildren) {
   const [songs, setSongs] = useState<Song[]>(seededSongs);
   const [setlist, setSetlist] = useState<Setlist>(seededSetlist);
   const [hasHydrated, setHasHydrated] = useState(false);
+  const backendBaseUrl = process.env.EXPO_PUBLIC_BASSTAB_API_URL?.trim();
+  const backendApi = useMemo(() => createBassTabApiFromEnv(), []);
+  const backendStorageLabel = 'BassTab backend';
+
+  const hydrateFromBackend = async () => {
+    if (!backendApi) {
+      throw new Error('BassTab backend is not configured.');
+    }
+
+    const [songsMetadata, playlistDto] = await Promise.all([
+      backendApi.listSongs(),
+      backendApi.getPlaylist(),
+    ]);
+    const songDtos = await Promise.all(
+      songsMetadata.map((songMetadata) => backendApi.getSong(songMetadata.id)),
+    );
+    const nextSongs = songDtos.map(fromSongDto);
+    const knownSongIds = new Set(nextSongs.map((song) => song.id));
+    const playlist = fromPlaylistDto(playlistDto);
+
+    setSongs(nextSongs);
+    setSetlist(
+      normalizeSetlist({
+        ...playlist,
+        songIds: playlist.songIds.filter((songId) => knownSongIds.has(songId)),
+      }),
+    );
+  };
 
   useEffect(() => {
-    // AsyncStorage is currently just the app-local persistence layer.
-    // It preserves data across reloads/restarts, but it is not a sync engine or
-    // the long-term source of truth once a backend exists.
+    if (backendApi) {
+      console.info(`[BassTab] backend mode enabled: ${backendBaseUrl}`);
+
+      if (backendBaseUrl && /localhost|127\.0\.0\.1/.test(backendBaseUrl)) {
+        console.warn(
+          '[BassTab] backend URL uses localhost/127.0.0.1. On real devices this points to the device itself.',
+        );
+      }
+    } else {
+      console.warn('[BassTab] backend mode disabled. EXPO_PUBLIC_BASSTAB_API_URL is not set.');
+    }
+  }, [backendApi, backendBaseUrl]);
+
+  useEffect(() => {
     let isMounted = true;
 
-    const hydrate = async () => {
+    const hydrateFromStorage = async () => {
       try {
         const [storedSongs, storedSetlist] = await Promise.all([
           AsyncStorage.getItem(storageKeys.songs),
@@ -226,6 +266,19 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         }
       } catch (error) {
         console.warn('BassTab storage hydrate failed', error);
+      }
+    };
+
+    const hydrate = async () => {
+      try {
+        if (backendApi) {
+          await hydrateFromBackend();
+        } else {
+          await hydrateFromStorage();
+        }
+      } catch (error) {
+        console.warn('BassTab backend hydrate failed', error);
+        await hydrateFromStorage();
       } finally {
         if (isMounted) {
           setHasHydrated(true);
@@ -238,7 +291,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [backendApi]);
 
   useEffect(() => {
     if (!hasHydrated) {
@@ -259,8 +312,8 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     persist();
   }, [hasHydrated, setlist, songs]);
 
-  const createSong = (input?: SongInput) => {
-    const newSong: Song = {
+  const createSong = async (input?: SongInput): Promise<Song> => {
+    const draftSong: Song = {
       id: createId('song'),
       title: input?.title ?? 'Untitled Song',
       artist: input?.artist ?? 'Unknown Artist',
@@ -272,33 +325,120 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       rows: [createEmptyRow('Intro')],
     };
 
-    setSongs((current) => [newSong, ...current]);
+    if (!backendApi) {
+      setSongs((current) => [draftSong, ...current]);
+      return draftSong;
+    }
 
-    return newSong;
+    const createdSong = fromSongDto(
+      await backendApi.createSong({
+        title: draftSong.title,
+        artist: draftSong.artist,
+        key: draftSong.key,
+        feelNote: draftSong.feelNote,
+        tuning: draftSong.tuning,
+        chart: {
+          stringNames: draftSong.stringNames,
+          rows: draftSong.rows,
+        },
+      }),
+    );
+
+    setSongs((current) => [createdSong, ...current.filter((song) => song.id !== createdSong.id)]);
+
+    return createdSong;
   };
 
   const deleteSong = (songId: string) => {
+    const syncState = { nextSongIds: [] as string[] };
+
     setSongs((current) => current.filter((song) => song.id !== songId));
     setSetlist((current) => ({
       ...current,
       name: FREE_SETLIST_TITLE,
-      songIds: current.songIds.filter((id) => id !== songId),
+      songIds: (() => {
+        const nextIds = current.songIds.filter((id) => id !== songId);
+        syncState.nextSongIds = nextIds;
+        return nextIds;
+      })(),
       updatedAt: new Date().toISOString(),
     }));
+
+    if (!backendApi) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await backendApi.deleteSong(songId);
+        await backendApi.replacePlaylistOrder({ songIds: syncState.nextSongIds });
+      } catch (error) {
+        console.warn('BassTab backend deleteSong failed', error);
+      }
+    })();
   };
 
   const updateSong = (songId: string, updates: Partial<Song>) => {
+    const syncState = { nextSongForSync: null as Song | null };
+
     setSongs((current) =>
       current.map((song) =>
-        song.id === songId ? updateTimestamp({ ...song, ...updates }) : song,
+        song.id === songId
+          ? (() => {
+            const nextSong = updateTimestamp({ ...song, ...updates });
+            syncState.nextSongForSync = nextSong;
+            return nextSong;
+          })()
+          : song,
       ),
     );
+
+    const nextSongForSync = syncState.nextSongForSync;
+
+    if (!nextSongForSync) {
+      return;
+    }
+
+    if (!backendApi) {
+      return;
+    }
+
+    const metadataPayload = {
+      ...(updates.title !== undefined ? { title: updates.title } : {}),
+      ...(updates.artist !== undefined ? { artist: updates.artist } : {}),
+      ...(updates.key !== undefined ? { key: updates.key } : {}),
+      ...(updates.feelNote !== undefined ? { feelNote: updates.feelNote } : {}),
+      ...(updates.tuning !== undefined ? { tuning: updates.tuning } : {}),
+    };
+    const hasMetadataUpdate = Object.keys(metadataPayload).length > 0;
+    const hasChartUpdate = updates.stringNames !== undefined || updates.rows !== undefined;
+
+    void (async () => {
+      try {
+        if (hasMetadataUpdate) {
+          await backendApi.updateSongMetadata(songId, metadataPayload);
+        }
+
+        if (hasChartUpdate) {
+          await backendApi.replaceSongChart(songId, {
+            chart: {
+              stringNames: nextSongForSync.stringNames,
+              rows: nextSongForSync.rows,
+            },
+          });
+        }
+      } catch (error) {
+        console.warn('BassTab backend updateSong failed', error);
+      }
+    })();
   };
 
   const updateSongChart = (
     songId: string,
     chart: Pick<SongChart, 'tab' | 'rowAnnotations' | 'rowBarCounts'>,
   ) => {
+    const syncState = { nextSongForSync: null as Song | null };
+
     setSongs((current) =>
       current.map((song) => {
         if (song.id !== songId) {
@@ -306,12 +446,35 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         }
 
         const nextSongShape = mergeChartIntoSongRows(song, chart);
-        return updateTimestamp({
+        const nextSong = updateTimestamp({
           ...song,
           ...nextSongShape,
         });
+        syncState.nextSongForSync = nextSong;
+        return nextSong;
       }),
     );
+
+    const nextSongForSync = syncState.nextSongForSync;
+
+    if (!nextSongForSync) {
+      return;
+    }
+
+    if (!backendApi) {
+      return;
+    }
+
+    void backendApi
+      .replaceSongChart(songId, {
+        chart: {
+          stringNames: nextSongForSync.stringNames,
+          rows: nextSongForSync.rows,
+        },
+      })
+      .catch((error) => {
+        console.warn('BassTab backend updateSongChart failed', error);
+      });
   };
 
   const reorderSetlist = (songIds: string[]) => {
@@ -321,9 +484,79 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       songIds,
       updatedAt: new Date().toISOString(),
     }));
+
+    if (!backendApi) {
+      return;
+    }
+
+    void backendApi
+      .replacePlaylistOrder({ songIds })
+      .then((playlistDto) => {
+        setSetlist(normalizeSetlist(fromPlaylistDto(playlistDto)));
+      })
+      .catch((error) => {
+        console.warn('BassTab backend reorderSetlist failed', error);
+      });
   };
 
   const saveStateToFile = async () => {
+    if (backendApi) {
+      const remoteSongs = await backendApi.listSongs();
+      const remoteSongIds = new Set(remoteSongs.map((song) => song.id));
+      const createdByLocalId = new Map<string, Song>();
+
+      for (const song of songs) {
+        if (remoteSongIds.has(song.id)) {
+          await backendApi.updateSongMetadata(song.id, {
+            title: song.title,
+            artist: song.artist,
+            key: song.key,
+            feelNote: song.feelNote,
+            tuning: song.tuning,
+          });
+          await backendApi.replaceSongChart(song.id, {
+            chart: {
+              stringNames: song.stringNames,
+              rows: song.rows,
+            },
+          });
+          continue;
+        }
+
+        const createdSong = fromSongDto(
+          await backendApi.createSong({
+            title: song.title,
+            artist: song.artist,
+            key: song.key,
+            feelNote: song.feelNote,
+            tuning: song.tuning,
+            chart: {
+              stringNames: song.stringNames,
+              rows: song.rows,
+            },
+          }),
+        );
+        createdByLocalId.set(song.id, createdSong);
+      }
+
+      const mapSongId = (songId: string) => createdByLocalId.get(songId)?.id ?? songId;
+      const nextSongs = songs.map((song) => createdByLocalId.get(song.id) ?? song);
+      const nextSetlist = normalizeSetlist({
+        ...setlist,
+        songIds: setlist.songIds.map(mapSongId),
+        updatedAt: new Date().toISOString(),
+      });
+
+      await backendApi.replacePlaylistOrder({ songIds: nextSetlist.songIds });
+
+      if (createdByLocalId.size > 0) {
+        setSongs(nextSongs);
+        setSetlist(nextSetlist);
+      }
+
+      return backendStorageLabel;
+    }
+
     const snapshot: BassTabSnapshot = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -335,6 +568,11 @@ export function BassTabProvider({ children }: PropsWithChildren) {
   };
 
   const loadStateFromFile = async () => {
+    if (backendApi) {
+      await hydrateFromBackend();
+      return backendStorageLabel;
+    }
+
     const nextState = parseSnapshot(await loadSnapshotFile());
 
     setSongs(nextState.songs);

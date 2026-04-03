@@ -25,24 +25,28 @@ export function ImportPasteScreen({ navigation }: Props) {
   const [artist, setArtist] = useState('Unknown Artist');
   const [tabText, setTabText] = useState(defaultTab);
 
-  const handleCreateDraft = () => {
-    const song = createSong({ title, artist });
-    const { stringNames, bars } = parseTab(tabText);
+  const handleCreateDraft = async () => {
+    try {
+      const song = await createSong({ title, artist });
+      const { stringNames, bars } = parseTab(tabText);
 
-    updateSong(song.id, {
-      stringNames,
-      rows: [
-        {
-          id: createId('row'),
-          label: 'Imported Row',
-          beforeText: '',
-          afterText: '',
-          bars,
-        },
-      ],
-    });
+      updateSong(song.id, {
+        stringNames,
+        rows: [
+          {
+            id: createId('row'),
+            label: 'Imported Row',
+            beforeText: '',
+            afterText: '',
+            bars,
+          },
+        ],
+      });
 
-    navigation.replace('SongEditor', { songId: song.id });
+      navigation.replace('SongEditor', { songId: song.id });
+    } catch (error) {
+      console.warn('Could not create pasted draft song', error);
+    }
   };
 
   return (

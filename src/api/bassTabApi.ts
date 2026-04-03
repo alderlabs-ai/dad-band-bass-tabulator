@@ -44,7 +44,17 @@ export class HttpBassTabApi implements BassTabApi {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: BassTabApiClientOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    if (options.fetchImpl) {
+      this.fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) =>
+        options.fetchImpl!.call(globalThis, input, init)) as typeof fetch;
+      return;
+    }
+
+    if (typeof globalThis.fetch !== 'function') {
+      throw new Error('BassTab API requires fetch to be available in this runtime.');
+    }
+
+    this.fetchImpl = globalThis.fetch.bind(globalThis);
   }
 
   async listSongs(): Promise<SongMetadataDto[]> {
@@ -119,7 +129,18 @@ export class HttpBassTabApi implements BassTabApi {
     init: RequestInit,
     parse: (payload: unknown) => T,
   ): Promise<T> {
-    const response = await this.fetchImpl(joinPath(this.options.baseUrl, path), init);
+    const url = joinPath(this.options.baseUrl, path);
+    const method = init.method ?? 'GET';
+    let response: Response;
+
+    console.info(`[BassTab API] ${method} ${url}`);
+
+    try {
+      response = await this.fetchImpl(url, init);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`BassTab API request failed (${method} ${url}): ${detail}`);
+    }
 
     if (!response.ok) {
       let errorDetail = '';

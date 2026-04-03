@@ -52,15 +52,20 @@ export function LibraryScreen({ navigation }: Props) {
     );
   }, [query, songs]);
 
-  const handleCreateSong = () => {
-    const song = createSong();
-    navigation.navigate('SongEditor', { songId: song.id });
+  const handleCreateSong = async () => {
+    try {
+      const song = await createSong();
+      navigation.navigate('SongEditor', { songId: song.id });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not create song.';
+      setFileActionMessage(`Could not create song: ${message}`);
+    }
   };
 
   const handleSaveState = async () => {
     try {
-      await saveStateToFile();
-      setFileActionMessage('Packed away for later on this device.');
+      const target = await saveStateToFile();
+      setFileActionMessage(`Packed away for later in ${target}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not pack it away.';
       setFileActionMessage(`Could not pack it away: ${message}`);
@@ -69,8 +74,8 @@ export function LibraryScreen({ navigation }: Props) {
 
   const handleLoadState = async () => {
     try {
-      await loadStateFromFile();
-      setFileActionMessage('Packed charts brought back onto the stand.');
+      const source = await loadStateFromFile();
+      setFileActionMessage(`Packed charts brought back from ${source}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not bring it back.';
       setFileActionMessage(`Could not bring it back: ${message}`);

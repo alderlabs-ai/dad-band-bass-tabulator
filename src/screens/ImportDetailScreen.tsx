@@ -21,13 +21,17 @@ export function ImportDetailScreen({ navigation, route }: Props) {
       ? 'Camera import and OCR are stubbed for now. Use this flow to create a blank draft song from a chart photo.'
       : 'PDF parsing is stubbed for now. Use this flow to spin up a blank draft song from a PDF-based chart.';
 
-  const handleCreateDraft = () => {
-    const song = createSong({
-      title: type === 'image' ? 'Imported Image Draft' : 'Imported PDF Draft',
-      artist: 'Needs Review',
-    });
+  const handleCreateDraft = async () => {
+    try {
+      const song = await createSong({
+        title: type === 'image' ? 'Imported Image Draft' : 'Imported PDF Draft',
+        artist: 'Needs Review',
+      });
 
-    navigation.replace('SongEditor', { songId: song.id });
+      navigation.replace('SongEditor', { songId: song.id });
+    } catch (error) {
+      console.warn('Could not create imported draft song', error);
+    }
   };
 
   return (
