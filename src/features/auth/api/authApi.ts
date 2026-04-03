@@ -239,10 +239,20 @@ export class AuthApi {
 
 export const createAuthApiFromEnv = (): AuthApi | null => {
   const baseUrl = process.env.EXPO_PUBLIC_BASSTAB_API_URL?.trim();
+  const productionBaseUrl = 'https://bass-tab-be.onrender.com';
+  const isProductionRuntime =
+    process.env.NODE_ENV === 'production' ||
+    (typeof globalThis !== 'undefined' &&
+      typeof (globalThis as { __DEV__?: unknown }).__DEV__ === 'boolean' &&
+      !(globalThis as { __DEV__?: boolean }).__DEV__);
 
-  if (!baseUrl) {
-    return null;
+  if (baseUrl) {
+    return new AuthApi({ baseUrl });
   }
 
-  return new AuthApi({ baseUrl });
+  if (isProductionRuntime) {
+    return new AuthApi({ baseUrl: productionBaseUrl });
+  }
+
+  return null;
 };

@@ -169,12 +169,23 @@ export class HttpBassTabApi implements BassTabApi {
 export const createBassTabApi = (options: BassTabApiClientOptions): BassTabApi =>
   new HttpBassTabApi(options);
 
+const productionBaseUrl = 'https://bass-tab-be.onrender.com';
+const isProductionRuntime =
+  process.env.NODE_ENV === 'production' ||
+  (typeof globalThis !== 'undefined' &&
+    typeof (globalThis as { __DEV__?: unknown }).__DEV__ === 'boolean' &&
+    !(globalThis as { __DEV__?: boolean }).__DEV__);
+
 export const createBassTabApiFromEnv = (): BassTabApi | null => {
   const baseUrl = process.env.EXPO_PUBLIC_BASSTAB_API_URL?.trim();
 
-  if (!baseUrl) {
-    return null;
+  if (baseUrl) {
+    return createBassTabApi({ baseUrl });
   }
 
-  return createBassTabApi({ baseUrl });
+  if (isProductionRuntime) {
+    return createBassTabApi({ baseUrl: productionBaseUrl });
+  }
+
+  return null;
 };
