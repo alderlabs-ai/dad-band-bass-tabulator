@@ -31,6 +31,15 @@ interface JsonRequestOptions {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const shouldSendNgrokBypassHeader = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.includes('ngrok');
+  } catch (_error) {
+    return false;
+  }
+};
+
 const normalizeHeaderNames = (headers: HeadersInit | undefined): string[] => {
   if (!headers) {
     return [];
@@ -239,8 +248,11 @@ export class AuthApi {
     const url = `${baseUrl}${path}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'ngrok-skip-browser-warning': 'true',
     };
+
+    if (shouldSendNgrokBypassHeader(url)) {
+      headers['ngrok-skip-browser-warning'] = 'true';
+    }
 
     if (options.body !== undefined) {
       headers['Content-Type'] = 'application/json';

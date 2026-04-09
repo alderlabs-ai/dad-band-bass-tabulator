@@ -112,10 +112,33 @@ interface ApiErrorPayload {
 const jsonHeaders = {
   Accept: 'application/json',
   'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
 };
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const toHeaderRecord = (headers?: HeadersInit): Record<string, string> => {
+  if (!headers) {
+    return {};
+  }
+
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+
+  return headers;
+};
+
+const shouldSendNgrokBypassHeader = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.includes('ngrok');
+  } catch (_error) {
+    return false;
+  }
+};
 
 const joinPath = (baseUrl: string, path: string): string =>
   `${trimTrailingSlash(baseUrl)}${path.startsWith('/') ? path : `/${path}`}`;
@@ -429,14 +452,19 @@ export class HttpBassTabApi implements BassTabApi {
     console.info(`[BassTab API] ${method} ${url}`);
 
     try {
+      const requestHeaders: Record<string, string> = {
+        Accept: 'application/json',
+        ...toHeaderRecord(init.headers),
+      };
+
+      if (shouldSendNgrokBypassHeader(url)) {
+        requestHeaders['ngrok-skip-browser-warning'] = 'true';
+      }
+
       response = await this.fetchImpl(url, {
         ...init,
         credentials: 'include',
-        headers: {
-          Accept: 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          ...init.headers,
-        },
+        headers: requestHeaders,
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);

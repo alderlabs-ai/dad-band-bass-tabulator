@@ -34,6 +34,14 @@ const isProductionRuntime =
     !(globalThis as { __DEV__?: boolean }).__DEV__);
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const shouldSendNgrokBypassHeader = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.includes('ngrok');
+  } catch (_error) {
+    return false;
+  }
+};
 
 const getTelemetryBaseUrl = (): string | null => {
   const baseUrl = process.env.EXPO_PUBLIC_BASSTAB_API_URL?.trim();
@@ -161,7 +169,7 @@ const sendPayload = async (payload: TelemetryPayload) => {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
+      ...(shouldSendNgrokBypassHeader(url) ? { 'ngrok-skip-browser-warning': 'true' } : {}),
     },
     body,
     keepalive: true,
