@@ -118,7 +118,7 @@ function DadBandBadge() {
 export function AISongCreationScreen({ navigation }: Props) {
   const { tier, capabilities } = useSubscription();
   const { showUpgradePrompt } = useUpgradePrompt();
-  const { importSongFromDto } = useBassTab();
+  const { songs, importSongFromDto } = useBassTab();
   const backendApi = useMemo(() => createBassTabApiFromEnv(), []);
 
   const [artist, setArtist] = useState('');
@@ -170,9 +170,20 @@ export function AISongCreationScreen({ navigation }: Props) {
 
   const canGenerate =
     artist.trim().length > 0 && title.trim().length > 0 && generateState !== 'generating';
+  const maxSongs = capabilities.maxSongs;
+  const hasSongLimit = tier === 'FREE' && maxSongs !== null;
+  const remainingSongSlots = hasSongLimit ? Math.max(maxSongs - songs.length, 0) : null;
+  const isLibraryFull = hasSongLimit && remainingSongSlots === 0;
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
+
+    if (isLibraryFull) {
+      setGenerateState('idle');
+      setErrorMessage('Dad Band storage is full. Upgrade to Pro so this tune has somewhere to live.');
+      showUpgradePrompt('SONG_LIMIT');
+      return;
+    }
 
     if (!backendApi) {
       setErrorMessage('AI generation requires an active connection.');
@@ -253,9 +264,17 @@ export function AISongCreationScreen({ navigation }: Props) {
           {/* Plan info */}
           {tier !== 'PRO' ? (
             <View style={styles.planRow}>
-              <Text style={styles.planText}>Free plan — limited generations. </Text>
+              <Text style={styles.planText}>
+                {isLibraryFull
+                  ? 'Free plan — library full. No room for new AI tracks. '
+                  : `Free plan — limited generations${
+                    typeof remainingSongSlots === 'number'
+                      ? ` and ${remainingSongSlots} song slot${remainingSongSlots === 1 ? '' : 's'} left`
+                      : ''
+                  }. `}
+              </Text>
               <Pressable onPress={() => navigation.navigate('Upgrade')}>
-                <Text style={styles.planLink}>Upgrade to Pro →</Text>
+                <Text style={styles.planLink}>{isLibraryFull ? 'Go Pro for unlimited songs →' : 'Upgrade to Pro →'}</Text>
               </Pressable>
             </View>
           ) : (
@@ -335,12 +354,14 @@ export function AISongCreationScreen({ navigation }: Props) {
           ) : (
             <>
               <PrimaryButton
-                label="🎸 Generate Something Questionable"
+                label={isLibraryFull ? '🧱 Library Full — Go Pro' : '🎸 Generate Something Questionable'}
                 onPress={() => { void handleGenerate(); }}
-                disabled={!canGenerate}
+                disabled={!canGenerate || isLibraryFull}
               />
               <Text style={styles.microcopy}>
-                AI tabs are a starting point. Your ears are still the boss.
+                {isLibraryFull
+                  ? 'You nailed the free limit. Time to go Pro and keep the riffs coming.'
+                  : 'AI tabs are a starting point. Your ears are still the boss.'}
               </Text>
             </>
           )}

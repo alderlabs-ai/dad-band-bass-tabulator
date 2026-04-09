@@ -1,5 +1,11 @@
 export type SubscriptionTier = 'FREE' | 'PRO';
-export type SubscriptionStatus = 'FREE' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED';
+export type SubscriptionStatus =
+  | 'active'
+  | 'cancellation_scheduled'
+  | 'cancelled'
+  | 'expired'
+  | 'free'
+  | 'incomplete';
 export type BillingCurrency = 'GBP' | 'USD' | 'EUR';
 
 export interface SubscriptionCapabilities {

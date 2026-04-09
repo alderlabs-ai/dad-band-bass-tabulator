@@ -26,6 +26,8 @@ import {
 interface SubscriptionContextValue {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   capabilities: SubscriptionCapabilities;
   pricing: SubscriptionPricing;
   priceLabel: string;
@@ -223,7 +225,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
           const nextSnapshot = await subscriptionService.loadSnapshot();
           setSnapshot(nextSnapshot);
 
-          if (nextSnapshot.tier === 'PRO' && nextSnapshot.status !== 'FREE') {
+          if (nextSnapshot.tier === 'PRO') {
             setFinalizingUpgrade(false);
             setFinalizingError(null);
             await refresh();
@@ -319,7 +321,9 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   const value = useMemo(
     () => ({
       tier: snapshot?.tier ?? 'FREE',
-      status: snapshot?.status ?? 'FREE',
+      status: snapshot?.status ?? 'free',
+      currentPeriodEnd: snapshot?.currentPeriodEnd ?? null,
+      cancelAtPeriodEnd: snapshot?.cancelAtPeriodEnd ?? false,
       capabilities: snapshot?.capabilities ?? defaultCapabilities,
       pricing,
       priceLabel,

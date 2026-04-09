@@ -58,7 +58,14 @@ export interface ReplacePlaylistOrderRequestDto {
 }
 
 export type SubscriptionTierDto = 'FREE' | 'PRO';
-export type SubscriptionStatusDto = 'FREE' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED';
+export type SubscriptionStatusDto =
+  | 'active'
+  | 'cancellation_scheduled'
+  | 'cancelled'
+  | 'expired'
+  | 'free'
+  | 'incomplete';
+export type SubscriptionPlanCodeDto = 'free' | 'pro';
 export type BillingCurrencyDto = 'GBP' | 'USD' | 'EUR';
 
 export interface SubscriptionCapabilitiesDto {
@@ -73,6 +80,7 @@ export interface SubscriptionCapabilitiesDto {
 export interface SubscriptionSnapshotDto {
   tier: SubscriptionTierDto;
   status: SubscriptionStatusDto;
+  plan?: SubscriptionPlanCodeDto;
   planCode: string | null;
   currency: BillingCurrencyDto | null;
   unitAmountMinor: number | null;
@@ -119,16 +127,10 @@ export interface SubscriptionUpgradeResponseDto {
 }
 
 export interface BillingPortalSessionDto {
-  portalUrl: string;
+  url: string;
 }
 
-export interface SubscriptionDowngradeRequestDto {
-  returnUrl: string;
-}
-
-export interface SubscriptionDowngradeResponseDto {
-  mode: 'MOCK' | 'STRIPE';
-  portalSession?: BillingPortalSessionDto;
+export interface SubscriptionCancelResponseDto {
   snapshot: SubscriptionSnapshotDto;
 }
 
@@ -266,7 +268,15 @@ const isPlaylistDto = (value: unknown): value is PlaylistDto => {
 };
 
 const subscriptionTiers: SubscriptionTierDto[] = ['FREE', 'PRO'];
-const subscriptionStatuses: SubscriptionStatusDto[] = ['FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED'];
+const subscriptionStatuses: SubscriptionStatusDto[] = [
+  'active',
+  'cancellation_scheduled',
+  'cancelled',
+  'expired',
+  'free',
+  'incomplete',
+];
+const subscriptionPlans: SubscriptionPlanCodeDto[] = ['free', 'pro'];
 const billingCurrencies: BillingCurrencyDto[] = ['GBP', 'USD', 'EUR'];
 const publishedSongStatuses: PublishedSongStatusDto[] = ['PUBLISHED', 'UNLISTED', 'MODERATION_HIDDEN'];
 const ownershipStatuses: OwnershipStatusDto[] = ['ACTIVE', 'ORPHANED'];
@@ -315,14 +325,54 @@ export const parseSubscriptionCapabilityDefaultsDto = (value: unknown): Subscrip
   return value;
 };
 
+const normalizeSubscriptionStatus = (status: unknown): SubscriptionStatusDto | null => {
+  if (typeof status !== 'string') {
+    return null;
+  }
+
+  const legacyStatusToSnapshotStatus: Record<string, SubscriptionStatusDto> = {
+    FREE: 'free',
+    TRIALING: 'active',
+    ACTIVE: 'active',
+    PAST_DUE: 'active',
+    CANCELLED: 'cancelled',
+    CANCELED: 'cancelled',
+    EXPIRED: 'expired',
+    INCOMPLETE: 'incomplete',
+    INCOMPLETE_EXPIRED: 'expired',
+  };
+  const mappedLegacy = legacyStatusToSnapshotStatus[status.toUpperCase()];
+
+  if (mappedLegacy) {
+    return mappedLegacy;
+  }
+
+  const normalized = status.toLowerCase() as SubscriptionStatusDto;
+  if (subscriptionStatuses.includes(normalized)) {
+    return normalized;
+  }
+
+  return null;
+};
+
 const isSubscriptionSnapshotDto = (value: unknown): value is SubscriptionSnapshotDto => {
   if (!isRecord(value)) {
     return false;
   }
 
+  const normalizedStatus = normalizeSubscriptionStatus(value.status);
+  const normalizedPlan =
+    typeof value.plan === 'string'
+      ? (value.plan as SubscriptionPlanCodeDto)
+      : typeof value.tier === 'string'
+        ? value.tier.toLowerCase()
+        : null;
+
   return (
     subscriptionTiers.includes(value.tier as SubscriptionTierDto) &&
-    subscriptionStatuses.includes(value.status as SubscriptionStatusDto) &&
+    normalizedStatus !== null &&
+    subscriptionStatuses.includes(normalizedStatus) &&
+    (normalizedPlan === null || subscriptionPlans.includes(normalizedPlan as SubscriptionPlanCodeDto)) &&
     isNullableString(value.planCode) &&
     isNullableCurrency(value.currency) &&
     isNullableNumber(value.unitAmountMinor) &&
@@ -669,7 +719,20 @@ export const parseSubscriptionSnapshotDto = (value: unknown): SubscriptionSnapsh
     throw new Error('Invalid subscription snapshot response payload.');
   }
 
-  return value;
+  const snapshot = value as unknown as Record<string, unknown>;
+  const normalizedStatus = normalizeSubscriptionStatus(snapshot.status) ?? 'free';
+  const normalizedPlan =
+    typeof snapshot.plan === 'string'
+      ? (snapshot.plan as SubscriptionPlanCodeDto)
+      : typeof snapshot.tier === 'string'
+        ? (snapshot.tier.toLowerCase() as SubscriptionPlanCodeDto)
+        : 'free';
+
+  return {
+    ...(value as SubscriptionSnapshotDto),
+    status: normalizedStatus,
+    plan: normalizedPlan,
+  };
 };
 
 const isCheckoutSessionDto = (value: unknown): value is CheckoutSessionDto =>
@@ -678,7 +741,7 @@ const isCheckoutSessionDto = (value: unknown): value is CheckoutSessionDto =>
   typeof value.checkoutUrl === 'string';
 
 const isBillingPortalSessionDto = (value: unknown): value is BillingPortalSessionDto =>
-  isRecord(value) && typeof value.portalUrl === 'string';
+  isRecord(value) && typeof value.url === 'string';
 
 const isSubscriptionUpgradeResponseDto = (value: unknown): value is SubscriptionUpgradeResponseDto =>
   isRecord(value) &&
@@ -686,13 +749,11 @@ const isSubscriptionUpgradeResponseDto = (value: unknown): value is Subscription
   (value.snapshot === null || isSubscriptionSnapshotDto(value.snapshot)) &&
   (value.checkoutSession === undefined || isCheckoutSessionDto(value.checkoutSession));
 
-const isSubscriptionDowngradeResponseDto = (
+const isSubscriptionCancelResponseDto = (
   value: unknown,
-): value is SubscriptionDowngradeResponseDto =>
+): value is SubscriptionCancelResponseDto =>
   isRecord(value) &&
-  (value.mode === 'MOCK' || value.mode === 'STRIPE') &&
-  isSubscriptionSnapshotDto(value.snapshot) &&
-  (value.portalSession === undefined || isBillingPortalSessionDto(value.portalSession));
+  isSubscriptionSnapshotDto(value.snapshot);
 
 export const parseSubscriptionUpgradeResponseDto = (
   value: unknown,
@@ -704,11 +765,21 @@ export const parseSubscriptionUpgradeResponseDto = (
   return value;
 };
 
-export const parseSubscriptionDowngradeResponseDto = (
+export const parseSubscriptionCancelResponseDto = (
   value: unknown,
-): SubscriptionDowngradeResponseDto => {
-  if (!isSubscriptionDowngradeResponseDto(value)) {
-    throw new Error('Invalid subscription downgrade response payload.');
+): SubscriptionCancelResponseDto => {
+  if (!isSubscriptionCancelResponseDto(value)) {
+    throw new Error('Invalid subscription cancellation response payload.');
+  }
+
+  return value;
+};
+
+export const parseBillingPortalSessionDto = (
+  value: unknown,
+): BillingPortalSessionDto => {
+  if (!isBillingPortalSessionDto(value)) {
+    throw new Error('Invalid billing portal response payload.');
   }
 
   return value;

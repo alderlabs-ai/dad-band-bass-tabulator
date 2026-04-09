@@ -3,10 +3,8 @@ import * as Linking from 'expo-linking';
 
 import { BassTabApi, createBassTabApiFromEnv } from '../../api';
 import {
-  BillingPortalSessionDto,
   SubscriptionCapabilityDefaultsDto,
-  SubscriptionDowngradeRequestDto,
-  SubscriptionDowngradeResponseDto,
+  SubscriptionCancelResponseDto,
   SubscriptionPricingDto,
   SubscriptionSnapshotDto,
   SubscriptionUpgradeRequestDto,
@@ -25,7 +23,7 @@ const storageKeys = {
 
 const defaultFreeSnapshot: SubscriptionSnapshot = {
   tier: 'FREE',
-  status: 'FREE',
+  status: 'free',
   planCode: null,
   currency: 'GBP',
   unitAmountMinor: 499,
@@ -60,7 +58,7 @@ const defaultPricing: SubscriptionPricing = {
 };
 
 const mapSnapshot = (snapshot: SubscriptionSnapshotDto): SubscriptionSnapshot => ({
-  tier: snapshot.tier,
+  tier: snapshot.plan === 'pro' || snapshot.tier === 'PRO' ? 'PRO' : 'FREE',
   status: snapshot.status,
   communitySongsSaved: snapshot.communitySongsSaved,
   planCode: snapshot.planCode,
@@ -128,7 +126,8 @@ export interface SubscriptionService {
   loadPricing: () => Promise<SubscriptionPricing>;
   loadCapabilityDefaults: () => Promise<SubscriptionCapabilityDefaults>;
   upgradeToPro: (currency?: BillingCurrency) => Promise<SubscriptionUpgradeResponseDto>;
-  openBillingPortal: (returnUrl?: string) => Promise<SubscriptionDowngradeResponseDto>;
+  cancelSubscription: () => Promise<SubscriptionCancelResponseDto>;
+  loadBillingPortalUrl: () => Promise<string>;
 }
 
 class HybridSubscriptionService implements SubscriptionService {
@@ -191,16 +190,21 @@ class HybridSubscriptionService implements SubscriptionService {
     return this.api.upgrade(payload);
   }
 
-  async openBillingPortal(returnUrl: string = 'subscription/portal'): Promise<SubscriptionDowngradeResponseDto> {
+  async cancelSubscription(): Promise<SubscriptionCancelResponseDto> {
+    if (!this.api) {
+      throw new Error('Subscription cancellation requires backend API configuration.');
+    }
+
+    return this.api.cancelSubscription();
+  }
+
+  async loadBillingPortalUrl(): Promise<string> {
     if (!this.api) {
       throw new Error('Billing portal requires backend API configuration.');
     }
 
-    const payload: SubscriptionDowngradeRequestDto = {
-      returnUrl: this.buildUrl(returnUrl),
-    };
-
-    return this.api.downgrade(payload);
+    const { url } = await this.api.getBillingPortalUrl();
+    return url;
   }
 }
 

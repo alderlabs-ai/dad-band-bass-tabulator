@@ -17,15 +17,15 @@ import {
   parseSongMetadataDto,
   parseSongChartDto,
   parseSubscriptionCapabilityDefaultsDto,
-  parseSubscriptionDowngradeResponseDto,
+  parseBillingPortalSessionDto,
+  parseSubscriptionCancelResponseDto,
   parseSubscriptionPricingDto,
   parseSubscriptionSnapshotDto,
   parseSubscriptionUpgradeResponseDto,
   PlaylistDto,
   SaveCommunitySongRequestDto,
   SubscriptionCapabilityDefaultsDto,
-  SubscriptionDowngradeRequestDto,
-  SubscriptionDowngradeResponseDto,
+  SubscriptionCancelResponseDto,
   SubscriptionPricingDto,
   SubscriptionSnapshotDto,
   SubscriptionUpgradeRequestDto,
@@ -56,7 +56,8 @@ export interface BassTabApi {
   getSubscriptionPricing(): Promise<SubscriptionPricingDto>;
   getSubscriptionCapabilityDefaults(): Promise<SubscriptionCapabilityDefaultsDto>;
   upgrade(payload: SubscriptionUpgradeRequestDto): Promise<SubscriptionUpgradeResponseDto>;
-  downgrade(payload: SubscriptionDowngradeRequestDto): Promise<SubscriptionDowngradeResponseDto>;
+  cancelSubscription(): Promise<SubscriptionCancelResponseDto>;
+  getBillingPortalUrl(): Promise<{ url: string }>;
   mockUpgrade(payload: MockUpgradeRequestDto): Promise<SubscriptionSnapshotDto>;
   mockDowngrade(): Promise<SubscriptionSnapshotDto>;
   listSavedCommunitySongs(): Promise<CommunitySavedSongDto[]>;
@@ -274,16 +275,18 @@ export class HttpBassTabApi implements BassTabApi {
     );
   }
 
-  async downgrade(payload: SubscriptionDowngradeRequestDto): Promise<SubscriptionDowngradeResponseDto> {
+  async cancelSubscription(): Promise<SubscriptionCancelResponseDto> {
     return this.request(
-      '/v1/subscription/downgrade',
+      '/v1/subscription/cancel',
       {
         method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify(payload),
       },
-      parseSubscriptionDowngradeResponseDto,
+      parseSubscriptionCancelResponseDto,
     );
+  }
+
+  async getBillingPortalUrl(): Promise<{ url: string }> {
+    return this.request('/v1/billing/portal', { method: 'GET' }, parseBillingPortalSessionDto);
   }
 
   async mockUpgrade(payload: MockUpgradeRequestDto): Promise<SubscriptionSnapshotDto> {
