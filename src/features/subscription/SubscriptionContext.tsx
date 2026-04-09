@@ -12,6 +12,7 @@ import { Linking } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 
 import { useAuth } from '../auth/state/useAuth';
+import { logClientEvent } from '../../utils/clientTelemetry';
 import { mapSnapshotDto, subscriptionService } from './subscriptionService';
 import {
   BillingCurrency,
@@ -167,6 +168,12 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       nextSnapshot.communitySongsSaved,
       nextSnapshot.capabilities,
     );
+
+    logClientEvent('info', 'subscription.snapshot_refreshed', {
+      tier: nextSnapshot.tier,
+      status: nextSnapshot.status,
+      cancelAtPeriodEnd: nextSnapshot.cancelAtPeriodEnd,
+    });
   }, [isAuthenticated, updatePricingIfChanged]);
 
   const setCommunitySongsSaved = useCallback((value: number) => {
@@ -212,12 +219,14 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       cancelFinalizingPoll();
       setFinalizingUpgrade(false);
       setFinalizingError(null);
+      logClientEvent('warn', 'subscription.finalize_skipped_unauthenticated');
       return;
     }
 
     cancelFinalizingPoll();
     setFinalizingUpgrade(true);
     setFinalizingError(null);
+    logClientEvent('info', 'subscription.finalize_poll_started');
 
     let cancelled = false;
     finalizeCancelRef.current = () => {
@@ -231,6 +240,9 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
         if (!isAuthenticated) {
           setFinalizingUpgrade(false);
           setFinalizingError(null);
+          logClientEvent('warn', 'subscription.finalize_stopped_unauthenticated', {
+            attempt: attempt + 1,
+          });
           return;
         }
 
@@ -241,11 +253,20 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
           if (nextSnapshot.tier === 'PRO') {
             setFinalizingUpgrade(false);
             setFinalizingError(null);
+            logClientEvent('info', 'subscription.finalize_poll_succeeded', {
+              attempt: attempt + 1,
+              tier: nextSnapshot.tier,
+              status: nextSnapshot.status,
+            });
             await refresh();
             return;
           }
         } catch (error) {
           console.warn('Finalizing upgrade poll failed', error);
+          logClientEvent('warn', 'subscription.finalize_poll_attempt_failed', {
+            attempt: attempt + 1,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -253,6 +274,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
       if (!cancelled) {
         setFinalizingError('Waiting for Stripe is taking longer than expected.');
+        logClientEvent('warn', 'subscription.finalize_poll_timed_out');
       }
     })();
   }, [cancelFinalizingPoll, isAuthenticated, refresh]);
@@ -267,6 +289,9 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
     const handleUrl = ({ url }: { url: string }) => {
       const parsed = ExpoLinking.parse(url);
+      logClientEvent('info', 'subscription.linking_event_received', {
+        path: parsed.path ?? null,
+      });
 
       if (parsed.path?.startsWith('subscription/success')) {
         startFinalizingPoll();
@@ -274,6 +299,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
         setFinalizingUpgrade(false);
         setFinalizingError('Stripe checkout was cancelled.');
         cancelFinalizingPoll();
+        logClientEvent('info', 'subscription.checkout_cancelled_via_link');
       }
     };
 
@@ -329,6 +355,9 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       await refresh();
     } catch (error) {
       console.error('[Subscription] upgrade failed', error);
+      logClientEvent('error', 'subscription.upgrade_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     } finally {
       setIsLoading(false);

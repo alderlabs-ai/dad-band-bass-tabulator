@@ -75,7 +75,13 @@ export interface BassTabApiClientOptions {
   fetchImpl?: typeof fetch;
 }
 
-type UnauthorizedListener = () => void;
+export interface UnauthorizedEvent {
+  url: string;
+  method: string;
+  status: number;
+}
+
+type UnauthorizedListener = (event: UnauthorizedEvent) => void;
 
 const unauthorizedListeners = new Set<UnauthorizedListener>();
 
@@ -87,10 +93,10 @@ export const subscribeBassTabApiUnauthorized = (listener: UnauthorizedListener):
   };
 };
 
-const notifyBassTabApiUnauthorized = () => {
+const notifyBassTabApiUnauthorized = (event: UnauthorizedEvent) => {
   unauthorizedListeners.forEach((listener) => {
     try {
-      listener();
+      listener(event);
     } catch (error) {
       console.warn('BassTab API unauthorized listener failed', error);
     }
@@ -439,7 +445,11 @@ export class HttpBassTabApi implements BassTabApi {
 
     if (!response.ok) {
       if (response.status === 401) {
-        notifyBassTabApiUnauthorized();
+        notifyBassTabApiUnauthorized({
+          url,
+          method,
+          status: response.status,
+        });
       }
 
       let errorDetail = '';

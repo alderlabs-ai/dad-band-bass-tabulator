@@ -10,6 +10,7 @@ import {
 
 import { createAuthApiFromEnv } from '../api/authApi.ts';
 import { subscribeBassTabApiUnauthorized } from '../../../api/bassTabApi';
+import { logClientEvent } from '../../../utils/clientTelemetry';
 import { createAuthActions } from './authActions.ts';
 import { authReducer } from './authReducer.ts';
 import { initialAuthStoreState } from './authTypes.ts';
@@ -45,12 +46,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [actions]);
 
   useEffect(() => {
-    const unsubscribe = subscribeBassTabApiUnauthorized(() => {
+    const unsubscribe = subscribeBassTabApiUnauthorized((event) => {
       const current = stateRef.current.authState;
 
       if (current.type !== 'AUTHENTICATED') {
         return;
       }
+
+      logClientEvent('warn', 'auth.session_expired', {
+        userId: current.user.userId,
+        endpoint: event.url,
+        method: event.method,
+        status: event.status,
+      });
 
       dispatch({
         type: 'setDraftCredentials',

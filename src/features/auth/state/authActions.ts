@@ -3,6 +3,7 @@ import type { AuthEvent } from './authReducer.ts';
 import type { AuthStoreState, AuthView } from './authTypes.ts';
 import { toAuthErrorMessage } from '../utils/authErrorMessage.ts';
 import { isValidEmail, normalizeEmail } from '../utils/email.ts';
+import { logClientEvent } from '../../../utils/clientTelemetry';
 
 interface ActionDeps {
   api: AuthApi | null;
@@ -52,6 +53,9 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
 
     try {
       const session = await requireApi().getSession();
+      logClientEvent('info', 'auth.restore_session_succeeded', {
+        userId: session.user.userId,
+      });
       dispatch({ type: 'setAuthenticated', user: session.user });
       syncDrafts({
         email: session.user.email,
@@ -63,9 +67,13 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
       setError(null);
     } catch (error) {
       if (error instanceof AuthApiError && error.status === 401) {
+        logClientEvent('warn', 'auth.restore_session_unauthorized');
         dispatch({ type: 'setUnauthenticated' });
         setError(null);
       } else {
+        logClientEvent('error', 'auth.restore_session_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         dispatch({ type: 'setUnauthenticated' });
         setError(toAuthErrorMessage('restore', error));
       }
@@ -109,6 +117,9 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
 
     try {
       const response = await requireApi().login({ email, password });
+      logClientEvent('info', 'auth.login_succeeded', {
+        userId: response.user.userId,
+      });
       dispatch({ type: 'setAuthenticated', user: response.user });
       syncDrafts({
         email: response.user.email,
@@ -117,6 +128,9 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
         avatarUrl: response.user.avatarUrl ?? '',
       });
     } catch (error) {
+      logClientEvent('warn', 'auth.login_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       setError(toAuthErrorMessage('login', error));
     } finally {
       dispatch({ type: 'setLoading', loadingAction: null });
@@ -166,10 +180,16 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
         handle,
         avatarUrl: avatarUrl || undefined,
       });
+      logClientEvent('info', 'auth.register_succeeded', {
+        handle,
+      });
       dispatch({ type: 'setAuthView', authView: 'LOGIN' });
       dispatch({ type: 'setDraftCredentials', password: '' });
       setInfo(`Check ${response.maskedEmail} for your verification link.`);
     } catch (error) {
+      logClientEvent('warn', 'auth.register_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       setError(toAuthErrorMessage('register', error));
     } finally {
       dispatch({ type: 'setLoading', loadingAction: null });
