@@ -1,4 +1,4 @@
-import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 
 import { palette } from '../constants/colors';
 
@@ -7,6 +7,7 @@ interface PrimaryButtonProps {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
   size?: 'default' | 'compact';
   disabled?: boolean;
 }
@@ -15,6 +16,7 @@ export function PrimaryButton({
   label,
   onPress,
   style,
+  labelStyle,
   variant = 'primary',
   size = 'default',
   disabled = false,
@@ -37,6 +39,7 @@ export function PrimaryButton({
           styles.label,
           size === 'compact' && styles.labelCompact,
           labelStyles[variant],
+          labelStyle,
         ]}
       >
         {label}

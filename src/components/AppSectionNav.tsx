@@ -39,6 +39,7 @@ export function AppSectionNav({
 }: AppSectionNavProps) {
   const { width } = useWindowDimensions();
   const isCompactLayout = width < 760;
+  const isVeryCompactLayout = width < 390;
   const { authState, logout, loadingAction, updateLocalProfile } = useAuth();
   const { tier, priceLabel } = useSubscription();
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -91,48 +92,111 @@ export function AppSectionNav({
     setSettingsVisible(false);
     setSettingsMessage(null);
   };
+  const navButtonStyle = isCompactLayout
+    ? [styles.navRailButton, isVeryCompactLayout && styles.navRailButtonTiny]
+    : undefined;
+  const navButtonLabelStyle = isVeryCompactLayout ? styles.navRailLabelTiny : undefined;
 
   return (
     <>
       <View style={styles.container}>
-        <View style={[styles.row, isCompactLayout && styles.rowCompact]}>
-          <PrimaryButton
-            label="Home"
-            onPress={onHome}
-            variant={current === 'Home' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-          <PrimaryButton
-            label="Library"
-            onPress={onLibrary}
-            variant={current === 'Library' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-          <PrimaryButton
-            label="Setlist"
-            onPress={onSetlist}
-            variant={current === 'Setlist' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-          <PrimaryButton
-            label="Community"
-            onPress={onImport}
-            variant={current === 'Import' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-          <PrimaryButton
-            label="AI Create"
-            onPress={onAICreate}
-            variant={current === 'AICreate' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-          <PrimaryButton
-            label="Go Pro"
-            onPress={onGoPro}
-            variant={current === 'GoPro' ? 'secondary' : 'ghost'}
-            size="compact"
-          />
-        </View>
+        {isCompactLayout ? (
+          <View style={styles.navRail}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.navRailContent}
+            >
+              <PrimaryButton
+                label="Home"
+                onPress={onHome}
+                variant={current === 'Home' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+              <PrimaryButton
+                label="Library"
+                onPress={onLibrary}
+                variant={current === 'Library' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+              <PrimaryButton
+                label="Setlist"
+                onPress={onSetlist}
+                variant={current === 'Setlist' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+              <PrimaryButton
+                label="Community"
+                onPress={onImport}
+                variant={current === 'Import' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+              <PrimaryButton
+                label="AI Create"
+                onPress={onAICreate}
+                variant={current === 'AICreate' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+              <PrimaryButton
+                label="Go Pro"
+                onPress={onGoPro}
+                variant={current === 'GoPro' ? 'secondary' : 'ghost'}
+                size="compact"
+                style={navButtonStyle}
+                labelStyle={navButtonLabelStyle}
+              />
+            </ScrollView>
+          </View>
+        ) : (
+          <View style={styles.row}>
+            <PrimaryButton
+              label="Home"
+              onPress={onHome}
+              variant={current === 'Home' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+            <PrimaryButton
+              label="Library"
+              onPress={onLibrary}
+              variant={current === 'Library' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+            <PrimaryButton
+              label="Setlist"
+              onPress={onSetlist}
+              variant={current === 'Setlist' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+            <PrimaryButton
+              label="Community"
+              onPress={onImport}
+              variant={current === 'Import' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+            <PrimaryButton
+              label="AI Create"
+              onPress={onAICreate}
+              variant={current === 'AICreate' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+            <PrimaryButton
+              label="Go Pro"
+              onPress={onGoPro}
+              variant={current === 'GoPro' ? 'secondary' : 'ghost'}
+              size="compact"
+            />
+          </View>
+        )}
         {signedInUser ? (
           <View style={[styles.accountCluster, isCompactLayout && styles.accountClusterCompact]}>
             <Text style={styles.accountLabel}>Signed in</Text>
@@ -397,9 +461,41 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  rowCompact: {
+  navRail: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dbe2f1',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  navRailContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 4,
+  },
+  navRailButton: {
+    minHeight: 32,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  navRailButtonTiny: {
+    minHeight: 30,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  navRailLabelTiny: {
+    fontSize: 12,
+  },
+  accountClusterCompact: {
     flex: 0,
     width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    alignSelf: 'stretch',
   },
   accountCluster: {
     minWidth: 280,
@@ -414,12 +510,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-  },
-  accountClusterCompact: {
-    width: '100%',
-    minWidth: 0,
-    maxWidth: '100%',
-    alignSelf: 'stretch',
   },
   accountLabel: {
     fontSize: 10,
