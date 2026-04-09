@@ -74,7 +74,7 @@ export function RegisterScreen() {
   };
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Create your account</Text>
         <Text style={styles.body}>

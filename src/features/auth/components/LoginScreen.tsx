@@ -43,7 +43,7 @@ export function LoginScreen() {
   };
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Sign in to BassTab</Text>
         <Text style={styles.body}>

@@ -208,6 +208,13 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const startFinalizingPoll = useCallback(() => {
+    if (!isAuthenticated) {
+      cancelFinalizingPoll();
+      setFinalizingUpgrade(false);
+      setFinalizingError(null);
+      return;
+    }
+
     cancelFinalizingPoll();
     setFinalizingUpgrade(true);
     setFinalizingError(null);
@@ -221,6 +228,12 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       const maxAttempts = 10;
 
       for (let attempt = 0; attempt < maxAttempts && !cancelled; attempt += 1) {
+        if (!isAuthenticated) {
+          setFinalizingUpgrade(false);
+          setFinalizingError(null);
+          return;
+        }
+
         try {
           const nextSnapshot = await subscriptionService.loadSnapshot();
           setSnapshot(nextSnapshot);
@@ -242,7 +255,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
         setFinalizingError('Waiting for Stripe is taking longer than expected.');
       }
     })();
-  }, [cancelFinalizingPoll, refresh]);
+  }, [cancelFinalizingPoll, isAuthenticated, refresh]);
 
   useEffect(() => {
     if (!isAuthenticated) {

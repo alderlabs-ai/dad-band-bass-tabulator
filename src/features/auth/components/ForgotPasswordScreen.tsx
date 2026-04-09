@@ -36,7 +36,7 @@ export function ForgotPasswordScreen() {
   };
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Reset your password</Text>
         <Text style={styles.body}>

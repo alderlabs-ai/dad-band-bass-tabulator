@@ -65,7 +65,7 @@ export function ResetPasswordScreen({ route, navigation }: Props) {
 
   if (!token) {
     return (
-      <ScreenContainer scroll={false} contentStyle={styles.container}>
+      <ScreenContainer contentStyle={styles.container}>
         <View style={styles.card}>
           <Text style={styles.title}>Invalid reset link</Text>
           <Text style={styles.body}>
@@ -84,7 +84,7 @@ export function ResetPasswordScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Choose a new password</Text>
         <Text style={styles.body}>

@@ -65,7 +65,7 @@ export function VerifyEmailScreen({ route, navigation }: Props) {
 
   if (!token) {
     return (
-      <ScreenContainer scroll={false} contentStyle={styles.container}>
+      <ScreenContainer contentStyle={styles.container}>
         <View style={[styles.card, styles.centerCard]}>
           <Text style={styles.title}>Invalid verification link</Text>
           <Text style={[styles.body, styles.centeredBody]}>
@@ -84,7 +84,7 @@ export function VerifyEmailScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScreenContainer scroll={false} contentStyle={styles.container}>
+    <ScreenContainer contentStyle={styles.container}>
       <View style={[styles.card, styles.centerCard]}>
         {isVerifying ? <ActivityIndicator color={palette.primary} /> : null}
         <Text style={styles.title}>{isAuthenticated ? 'Email verified' : 'Verifying email...'}</Text>
