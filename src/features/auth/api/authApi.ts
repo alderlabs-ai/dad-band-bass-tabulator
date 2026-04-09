@@ -10,6 +10,7 @@ import type {
   UserDto,
   VerifyEmailRequest,
 } from './authContracts.ts';
+import { logClientEvent } from '../../../utils/clientTelemetry';
 
 type AuthAction =
   | 'session'
@@ -30,6 +31,21 @@ interface JsonRequestOptions {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const normalizeHeaderNames = (headers: HeadersInit | undefined): string[] => {
+  if (!headers) {
+    return [];
+  }
+
+  if (headers instanceof Headers) {
+    return Array.from(headers.keys());
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.map(([name]) => name);
+  }
+
+  return Object.keys(headers);
+};
 const isDevRuntime =
   (typeof globalThis !== 'undefined' &&
     typeof (globalThis as { __DEV__?: unknown }).__DEV__ === 'boolean' &&
@@ -231,16 +247,41 @@ export class AuthApi {
     }
 
     let response: Response;
+    const requestInit: RequestInit = {
+      method: options.method,
+      credentials: 'include',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    };
+
+    logClientEvent('info', 'auth.fetch_start', {
+      action,
+      url,
+      method: requestInit.method ?? 'GET',
+      credentials: requestInit.credentials ?? 'default',
+      mode: requestInit.mode ?? 'default',
+      hasBody: Boolean(requestInit.body),
+      headerNames: normalizeHeaderNames(requestInit.headers),
+    });
 
     try {
-      response = await globalThis.fetch(url, {
-        method: options.method,
-        credentials: 'include',
-        headers,
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      response = await globalThis.fetch(url, requestInit);
+      logClientEvent('info', 'auth.fetch_response', {
+        action,
+        url,
+        method: requestInit.method ?? 'GET',
+        status: response.status,
+        ok: response.ok,
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
+      logClientEvent('error', 'auth.fetch_error', {
+        action,
+        url,
+        method: requestInit.method ?? 'GET',
+        error: detail,
+        name: error instanceof Error ? error.name : 'UnknownError',
+      });
       throw new AuthApiError(`Network request failed: ${detail}`, undefined, action);
     }
 
@@ -285,7 +326,7 @@ export class AuthApi {
 
 export const createAuthApiFromEnv = (): AuthApi | null => {
   const baseUrl = process.env.EXPO_PUBLIC_BASSTAB_API_URL?.trim();
-  const productionBaseUrl = 'https://bass-tab-be.onrender.com';
+  const productionBaseUrl = 'https://bass-tab-be-production.up.railway.app';
   const isProductionRuntime =
     process.env.NODE_ENV === 'production' ||
     (typeof globalThis !== 'undefined' &&

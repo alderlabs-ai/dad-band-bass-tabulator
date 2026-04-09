@@ -19,7 +19,7 @@ interface TelemetryPayload {
   };
 }
 
-const productionBaseUrl = 'https://bass-tab-be.onrender.com';
+const productionBaseUrl = 'https://bass-tab-be-production.up.railway.app';
 const sensitiveKeyPattern = /(password|token|secret|cookie|authorization|session)/i;
 const maxStringLength = 300;
 const maxEventsPerMinute = 30;

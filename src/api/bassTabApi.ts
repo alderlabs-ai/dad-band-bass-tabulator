@@ -523,7 +523,7 @@ export class BassTabApiError extends Error {
 export const createBassTabApi = (options: BassTabApiClientOptions): BassTabApi =>
   new HttpBassTabApi(options);
 
-const productionBaseUrl = 'https://bass-tab-be.onrender.com';
+const productionBaseUrl = 'https://bass-tab-be-production.up.railway.app';
 const isProductionRuntime =
   process.env.NODE_ENV === 'production' ||
   (typeof globalThis !== 'undefined' &&
