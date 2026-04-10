@@ -12,8 +12,8 @@ import { useSubscription } from '../features/subscription/SubscriptionContext';
 import { RootStackParamList } from '../navigation/types';
 
 const FALLBACK_FREE = {
-  maxSongs: 10,
-  maxCommunitySongs: 2,
+  maxSongs: 20,
+  maxCommunitySongs: 5,
   maxAiGenerations: 15,
   maxDailyAiGenerations: 3,
 } as const;

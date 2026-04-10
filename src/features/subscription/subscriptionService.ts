@@ -16,6 +16,12 @@ import {
   SubscriptionPricing,
   SubscriptionSnapshot,
 } from './subscriptionTypes';
+import {
+  DEFAULT_SUBSCRIPTION_CAPABILITIES,
+  DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS,
+  DEFAULT_SUBSCRIPTION_PRICING,
+  PRO_MONTHLY_PLAN_CODE,
+} from '../../constants/subscription';
 
 const storageKeys = {
   tier: 'basstab:subscription-tier',
@@ -31,32 +37,15 @@ const defaultFreeSnapshot: SubscriptionSnapshot = {
   currentPeriodEnd: null,
   trialEnd: null,
   cancelAtPeriodEnd: false,
-  capabilities: {
-    maxSongs: 10,
-    maxSetlists: 1,
-    maxCommunitySongs: 2,
-    maxCommunitySaves: 0,
-    maxStringCount: 4,
-    svgEnabled: false,
-    maxAiGenerations: 15,
-    maxDailyAiGenerations: 3,
-  },
+  capabilities: { ...DEFAULT_SUBSCRIPTION_CAPABILITIES },
   communitySongsSaved: 0,
 };
 
 const defaultPricing: SubscriptionPricing = {
-  plans: [
-    {
-      plan: 'PRO_MONTHLY',
-      label: 'BassTab Pro',
-      interval: 'MONTHLY',
-      prices: [
-        { currency: 'GBP', unitAmountMinor: 499 },
-        { currency: 'USD', unitAmountMinor: 499 },
-        { currency: 'EUR', unitAmountMinor: 499 },
-      ],
-    },
-  ],
+  plans: DEFAULT_SUBSCRIPTION_PRICING.plans.map((plan) => ({
+    ...plan,
+    prices: plan.prices.map((price) => ({ ...price })),
+  })),
 };
 
 const mapSnapshot = (snapshot: SubscriptionSnapshotDto): SubscriptionSnapshot => ({
@@ -97,15 +86,8 @@ const mapPricing = (pricing: SubscriptionPricingDto): SubscriptionPricing => ({
 });
 
 const defaultCapabilityDefaults: SubscriptionCapabilityDefaults = {
-  free: defaultFreeSnapshot.capabilities,
-  pro: {
-    ...defaultFreeSnapshot.capabilities,
-    maxSongs: null,
-    maxSetlists: null,
-    maxStringCount: null,
-    maxAiGenerations: null,
-    maxDailyAiGenerations: 20,
-  },
+  free: { ...DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS.free },
+  pro: { ...DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS.pro },
 };
 
 const mapCapabilityDefaults = (
@@ -191,7 +173,7 @@ class HybridSubscriptionService implements SubscriptionService {
     }
 
     const payload: SubscriptionUpgradeRequestDto = {
-      planCode: 'PRO_MONTHLY',
+      planCode: PRO_MONTHLY_PLAN_CODE,
       currency,
       successUrl: this.buildUrl('subscription/success'),
       cancelUrl: this.buildUrl('subscription/cancel'),

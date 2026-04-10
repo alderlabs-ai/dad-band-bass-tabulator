@@ -15,6 +15,12 @@ import { useAuth } from '../auth/state/useAuth';
 import { logClientEvent } from '../../utils/clientTelemetry';
 import { mapSnapshotDto, subscriptionService } from './subscriptionService';
 import {
+  DEFAULT_SUBSCRIPTION_CAPABILITIES,
+  DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS,
+  DEFAULT_SUBSCRIPTION_PRICING,
+  PRO_MONTHLY_PLAN_CODE,
+} from '../../constants/subscription';
+import {
   BillingCurrency,
   SubscriptionCapabilityDefaults,
   SubscriptionCapabilities,
@@ -45,31 +51,19 @@ interface SubscriptionContextValue {
 }
 
 const defaultCapabilities: SubscriptionCapabilities = {
-  maxSongs: 10,
-  maxSetlists: 1,
-  maxCommunitySongs: 2,
-  maxCommunitySaves: 2,
-  maxStringCount: 4,
-  svgEnabled: false,
+  ...DEFAULT_SUBSCRIPTION_CAPABILITIES,
 };
 
 const defaultCapabilityDefaults: SubscriptionCapabilityDefaults = {
-  free: defaultCapabilities,
-  pro: {
-    ...defaultCapabilities,
-    maxStringCount: null,
-  },
+  free: { ...DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS.free },
+  pro: { ...DEFAULT_SUBSCRIPTION_CAPABILITY_DEFAULTS.pro },
 };
 
 const defaultPricing: SubscriptionPricing = {
-  plans: [
-    {
-      plan: 'PRO_MONTHLY',
-      label: 'BassTab Pro',
-      interval: 'MONTHLY',
-      prices: [{ currency: 'GBP', unitAmountMinor: 499 }],
-    },
-  ],
+  plans: DEFAULT_SUBSCRIPTION_PRICING.plans.map((plan) => ({
+    ...plan,
+    prices: plan.prices.map((price) => ({ ...price })),
+  })),
 };
 
 const serializePricing = (pricing: SubscriptionPricing) =>
@@ -101,7 +95,7 @@ const pickDisplayedPrice = (
   snapshot: SubscriptionSnapshot | null,
   pricing: SubscriptionPricing,
 ): { currency: BillingCurrency; unitAmountMinor: number } => {
-  const monthlyPlan = pricing.plans.find((plan) => plan.plan === 'PRO_MONTHLY') ?? pricing.plans[0];
+  const monthlyPlan = pricing.plans.find((plan) => plan.plan === PRO_MONTHLY_PLAN_CODE) ?? pricing.plans[0];
   const preferredCurrency = snapshot?.currency ?? 'GBP';
   const preferredPrice = monthlyPlan?.prices.find((price) => price.currency === preferredCurrency);
   const fallbackPrice = monthlyPlan?.prices[0];

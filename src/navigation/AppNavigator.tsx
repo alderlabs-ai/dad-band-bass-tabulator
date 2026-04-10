@@ -56,6 +56,16 @@ function ProtectedRedirectScreen() {
   return <AuthRestoringScreen />;
 }
 
+function AuthenticatedRedirectScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    navigation.replace('MainTabs', { screen: 'Library' });
+  }, [navigation]);
+
+  return <AuthRestoringScreen />;
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -221,7 +231,7 @@ export function AppNavigator() {
             />
             <Stack.Screen
               name="AuthEntry"
-              component={AuthEntryScreen}
+              component={isAuthenticated ? AuthenticatedRedirectScreen : AuthEntryScreen}
               options={{ headerShown: false }}
             />
             {isAuthenticated ? (

@@ -1,4 +1,5 @@
 import { SongBar, SongRow } from '../types/models';
+import { DEFAULT_SUBSCRIPTION_CAPABILITIES } from '../constants/subscription';
 
 export interface SongMetadataDto {
   id: string;
@@ -293,6 +294,10 @@ const isNullableNumber = (value: unknown): value is number | null =>
 const isNullableCurrency = (value: unknown): value is BillingCurrencyDto | null =>
   value === null || billingCurrencies.includes(value as BillingCurrencyDto);
 
+const defaultSubscriptionCapabilitiesDto: SubscriptionCapabilitiesDto = {
+  ...DEFAULT_SUBSCRIPTION_CAPABILITIES,
+};
+
 const isSubscriptionCapabilitiesDto = (value: unknown): value is SubscriptionCapabilitiesDto => {
   if (!isRecord(value)) {
     return false;
@@ -359,34 +364,110 @@ const normalizeSubscriptionStatus = (status: unknown): SubscriptionStatusDto | n
   return null;
 };
 
-const isSubscriptionSnapshotDto = (value: unknown): value is SubscriptionSnapshotDto => {
-  if (!isRecord(value)) {
-    return false;
+const coerceNullableNumber = (value: unknown, fallback: number | null): number | null => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback;
   }
 
-  const normalizedStatus = normalizeSubscriptionStatus(value.status);
-  const normalizedPlan =
-    typeof value.plan === 'string'
-      ? (value.plan as SubscriptionPlanCodeDto)
-      : typeof value.tier === 'string'
-        ? value.tier.toLowerCase()
-        : null;
+  return value === null ? null : fallback;
+};
 
-  return (
-    subscriptionTiers.includes(value.tier as SubscriptionTierDto) &&
-    normalizedStatus !== null &&
-    subscriptionStatuses.includes(normalizedStatus) &&
-    (normalizedPlan === null || subscriptionPlans.includes(normalizedPlan as SubscriptionPlanCodeDto)) &&
-    isNullableString(value.planCode) &&
-    isNullableCurrency(value.currency) &&
-    isNullableNumber(value.unitAmountMinor) &&
-    isNullableString(value.currentPeriodStart) &&
-    isNullableString(value.currentPeriodEnd) &&
-    isNullableString(value.trialEnd) &&
-    typeof value.cancelAtPeriodEnd === 'boolean' &&
-    isSubscriptionCapabilitiesDto(value.capabilities) &&
-    typeof value.communitySongsSaved === 'number'
-  );
+const coerceNullableString = (value: unknown, fallback: string | null): string | null => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value === null ? null : fallback;
+};
+
+const normalizeSubscriptionPlan = (
+  plan: unknown,
+  tier: SubscriptionTierDto,
+): SubscriptionPlanCodeDto => {
+  if (typeof plan === 'string') {
+    const normalizedPlan = plan.toLowerCase() as SubscriptionPlanCodeDto;
+    if (subscriptionPlans.includes(normalizedPlan)) {
+      return normalizedPlan;
+    }
+  }
+
+  return tier === 'PRO' ? 'pro' : 'free';
+};
+
+const normalizeSubscriptionTier = (tier: unknown, plan: unknown): SubscriptionTierDto => {
+  if (subscriptionTiers.includes(tier as SubscriptionTierDto)) {
+    return tier as SubscriptionTierDto;
+  }
+
+  if (typeof plan === 'string' && plan.toLowerCase() === 'pro') {
+    return 'PRO';
+  }
+
+  return 'FREE';
+};
+
+const toSubscriptionCapabilitiesDto = (value: unknown): SubscriptionCapabilitiesDto => {
+  if (!isRecord(value)) {
+    return defaultSubscriptionCapabilitiesDto;
+  }
+
+  return {
+    maxSongs: coerceNullableNumber(value.maxSongs, defaultSubscriptionCapabilitiesDto.maxSongs),
+    maxSetlists: coerceNullableNumber(value.maxSetlists, defaultSubscriptionCapabilitiesDto.maxSetlists),
+    maxCommunitySongs: coerceNullableNumber(
+      value.maxCommunitySongs,
+      defaultSubscriptionCapabilitiesDto.maxCommunitySongs,
+    ),
+    maxCommunitySaves: coerceNullableNumber(
+      value.maxCommunitySaves,
+      defaultSubscriptionCapabilitiesDto.maxCommunitySaves,
+    ),
+    maxStringCount: coerceNullableNumber(
+      value.maxStringCount,
+      defaultSubscriptionCapabilitiesDto.maxStringCount,
+    ),
+    svgEnabled:
+      typeof value.svgEnabled === 'boolean'
+        ? value.svgEnabled
+        : defaultSubscriptionCapabilitiesDto.svgEnabled,
+    maxAiGenerations: coerceNullableNumber(
+      value.maxAiGenerations,
+      defaultSubscriptionCapabilitiesDto.maxAiGenerations ?? null,
+    ),
+    maxDailyAiGenerations: coerceNullableNumber(
+      value.maxDailyAiGenerations,
+      defaultSubscriptionCapabilitiesDto.maxDailyAiGenerations ?? null,
+    ),
+  };
+};
+
+const toSubscriptionSnapshotDto = (value: unknown): SubscriptionSnapshotDto | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const tier = normalizeSubscriptionTier(value.tier, value.plan);
+  const status = normalizeSubscriptionStatus(value.status) ?? 'free';
+  const plan = normalizeSubscriptionPlan(value.plan, tier);
+  const communitySongsSaved =
+    typeof value.communitySongsSaved === 'number' && Number.isFinite(value.communitySongsSaved)
+      ? Math.max(0, Math.floor(value.communitySongsSaved))
+      : 0;
+
+  return {
+    tier,
+    status,
+    plan,
+    planCode: coerceNullableString(value.planCode, null),
+    currency: isNullableCurrency(value.currency) ? value.currency : null,
+    unitAmountMinor: coerceNullableNumber(value.unitAmountMinor, null),
+    currentPeriodStart: coerceNullableString(value.currentPeriodStart, null),
+    currentPeriodEnd: coerceNullableString(value.currentPeriodEnd, null),
+    trialEnd: coerceNullableString(value.trialEnd, null),
+    cancelAtPeriodEnd: typeof value.cancelAtPeriodEnd === 'boolean' ? value.cancelAtPeriodEnd : false,
+    capabilities: toSubscriptionCapabilitiesDto(value.capabilities),
+    communitySongsSaved,
+  };
 };
 
 const isNullableSongMeta = (value: unknown): value is string | null | undefined =>
@@ -719,24 +800,12 @@ export const parsePlaylistDto = (value: unknown): PlaylistDto => {
 };
 
 export const parseSubscriptionSnapshotDto = (value: unknown): SubscriptionSnapshotDto => {
-  if (!isSubscriptionSnapshotDto(value)) {
+  const snapshot = toSubscriptionSnapshotDto(value);
+  if (!snapshot) {
     throw new Error('Invalid subscription snapshot response payload.');
   }
 
-  const snapshot = value as unknown as Record<string, unknown>;
-  const normalizedStatus = normalizeSubscriptionStatus(snapshot.status) ?? 'free';
-  const normalizedPlan =
-    typeof snapshot.plan === 'string'
-      ? (snapshot.plan as SubscriptionPlanCodeDto)
-      : typeof snapshot.tier === 'string'
-        ? (snapshot.tier.toLowerCase() as SubscriptionPlanCodeDto)
-        : 'free';
-
-  return {
-    ...(value as SubscriptionSnapshotDto),
-    status: normalizedStatus,
-    plan: normalizedPlan,
-  };
+  return snapshot;
 };
 
 const isCheckoutSessionDto = (value: unknown): value is CheckoutSessionDto =>
@@ -747,36 +816,44 @@ const isCheckoutSessionDto = (value: unknown): value is CheckoutSessionDto =>
 const isBillingPortalSessionDto = (value: unknown): value is BillingPortalSessionDto =>
   isRecord(value) && typeof value.url === 'string';
 
-const isSubscriptionUpgradeResponseDto = (value: unknown): value is SubscriptionUpgradeResponseDto =>
-  isRecord(value) &&
-  (value.mode === 'MOCK' || value.mode === 'STRIPE') &&
-  (value.snapshot === null || isSubscriptionSnapshotDto(value.snapshot)) &&
-  (value.checkoutSession === undefined || isCheckoutSessionDto(value.checkoutSession));
-
-const isSubscriptionCancelResponseDto = (
-  value: unknown,
-): value is SubscriptionCancelResponseDto =>
-  isRecord(value) &&
-  isSubscriptionSnapshotDto(value.snapshot);
-
 export const parseSubscriptionUpgradeResponseDto = (
   value: unknown,
 ): SubscriptionUpgradeResponseDto => {
-  if (!isSubscriptionUpgradeResponseDto(value)) {
+  if (!isRecord(value) || (value.mode !== 'MOCK' && value.mode !== 'STRIPE')) {
     throw new Error('Invalid subscription upgrade response payload.');
   }
 
-  return value;
+  const snapshot =
+    value.snapshot === null
+      ? null
+      : toSubscriptionSnapshotDto(value.snapshot);
+  if (value.snapshot !== null && !snapshot) {
+    throw new Error('Invalid subscription upgrade response payload.');
+  }
+  if (value.checkoutSession !== undefined && !isCheckoutSessionDto(value.checkoutSession)) {
+    throw new Error('Invalid subscription upgrade response payload.');
+  }
+
+  return {
+    mode: value.mode,
+    snapshot,
+    checkoutSession: value.checkoutSession as CheckoutSessionDto | undefined,
+  };
 };
 
 export const parseSubscriptionCancelResponseDto = (
   value: unknown,
 ): SubscriptionCancelResponseDto => {
-  if (!isSubscriptionCancelResponseDto(value)) {
+  if (!isRecord(value)) {
     throw new Error('Invalid subscription cancellation response payload.');
   }
 
-  return value;
+  const snapshot = toSubscriptionSnapshotDto(value.snapshot);
+  if (!snapshot) {
+    throw new Error('Invalid subscription cancellation response payload.');
+  }
+
+  return { snapshot };
 };
 
 export const parseBillingPortalSessionDto = (
