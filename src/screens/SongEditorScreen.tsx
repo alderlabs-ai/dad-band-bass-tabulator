@@ -80,13 +80,6 @@ export function SongEditorScreen({ navigation, route }: Props) {
 
   const song = songs.find((item) => item.id === songId);
 
-  console.info('[SongEditor] render start [PILL_BUILD_V2]', {
-    songId: song?.id,
-    hasDraft: Boolean(draftSong),
-    mode,
-    saveState,
-  });
-
   useEffect(() => {
     if (!song) {
       return;
@@ -130,11 +123,6 @@ export function SongEditorScreen({ navigation, route }: Props) {
       return null;
     }
 
-    console.info('[SongEditor] flattenSongRowsToChart start', {
-      songId: editorSong.id,
-      rows: editorSong.rows.length,
-    });
-
     try {
       return flattenSongRowsToChart(editorSong);
     } catch (error) {
@@ -143,14 +131,10 @@ export function SongEditorScreen({ navigation, route }: Props) {
     }
   }, [editorSong]);
 
-  console.info('[SongEditor] after chart memo', { songId: editorSong?.id });
-
   const parsedChart = useMemo(() => {
     if (!chart) {
       return null;
     }
-
-    console.info('[SongEditor] parseTab start', { tabLength: chart.tab.length });
 
     try {
       return parseTab(chart.tab);
@@ -159,11 +143,6 @@ export function SongEditorScreen({ navigation, route }: Props) {
       throw error;
     }
   }, [chart]);
-
-  console.info('[SongEditor] after parsed chart memo', {
-    songId: editorSong?.id,
-    parsedChart: parsedChart ? parsedChart.stringNames.length : null,
-  });
 
   const publishedInfo = song ? publishedLookup[song.id] : undefined;
   const lockMetadata =
@@ -190,11 +169,6 @@ export function SongEditorScreen({ navigation, route }: Props) {
     () => Array.from({ length: MAX_BEAT_COUNT - MIN_BEAT_COUNT + 1 }, (_, index) => MIN_BEAT_COUNT + index),
     [],
   );
-
-  console.log('[beatCount] SongEditor default beat selector render', {
-    effectiveDefaultBeatCount,
-    options: beatCountOptions,
-  });
 
   if (!song || !editorSong || !chart || !parsedChart) {
     return (
@@ -267,9 +241,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
         ),
       };
       const parsed = parseTab(mergedChart.tab);
-      console.log('[beatCount] handleChartChange - parsed bar beatCounts:', parsed.bars.map(b => b.beatCount));
       const nextSongShape = mergeChartIntoSongRows(current, mergedChart);
-      console.log('[beatCount] handleChartChange - nextSongShape bar beatCounts:', nextSongShape.rows.flatMap(r => r.bars.map(b => b.beatCount)));
 
       return {
         ...current,

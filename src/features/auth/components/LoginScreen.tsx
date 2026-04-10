@@ -18,6 +18,7 @@ export function LoginScreen() {
     infoMessage,
     loadingAction,
     login,
+    resendVerification,
     setAuthView,
     clearError,
     clearInfo,
@@ -26,21 +27,27 @@ export function LoginScreen() {
   const [password, setPassword] = useState(draftPassword);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
   const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
   const emailIsValid = isValidEmail(normalizedEmail);
   const passwordIsValid = password.length >= 8 && password.length <= 128;
   const showEmailError = (submitAttempted || normalizedEmail.length > 0) && !emailIsValid;
   const showPasswordError = (submitAttempted || password.length > 0) && !passwordIsValid;
   const isSubmitting = loadingAction === 'login';
+  const isResending = loadingAction === 'resendVerification';
 
   const submit = async () => {
     setSubmitAttempted(true);
+    setEmailNotVerified(false);
 
     if (isSubmitting || !emailIsValid || !passwordIsValid) {
       return;
     }
 
-    await login({ rawEmail: email, rawPassword: password });
+    const result = await login({ rawEmail: email, rawPassword: password });
+    if (result?.errorCode === 'EMAIL_NOT_VERIFIED') {
+      setEmailNotVerified(true);
+    }
   };
 
   return (
@@ -133,7 +140,23 @@ export function LoginScreen() {
           ) : null}
         </View>
 
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        {errorMessage && !emailNotVerified ? (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        ) : null}
+
+        {emailNotVerified ? (
+          <View style={styles.actions}>
+            <Text style={styles.errorText}>Your email isn't verified yet.</Text>
+            <PrimaryButton
+              label={isResending ? 'Sending...' : 'Resend verification email'}
+              onPress={() => {
+                void resendVerification({ rawEmail: email });
+                setEmailNotVerified(false);
+              }}
+              disabled={isResending}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.actions}>
           <PrimaryButton

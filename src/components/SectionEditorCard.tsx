@@ -147,11 +147,7 @@ export function SectionEditorCard({
   const inputRefs = useRef<Record<string, TextInput | null>>({});
   const quickPreviewRenderMode: TabPreviewRenderMode = !capabilities.svgEnabled ? 'ascii' : renderMode;
 
-  const { stringNames, bars } = useMemo(() => {
-    const result = parseTab(section.tab);
-    console.log('[beatCount] SectionEditorCard parseTab - bar beatCounts:', result.bars.map(b => b.beatCount));
-    return result;
-  }, [section.tab]);
+  const { stringNames, bars } = useMemo(() => parseTab(section.tab), [section.tab]);
   const rowBarCounts = useMemo(
     () => normalizeRowBarCounts(bars.length, section.rowBarCounts),
     [bars.length, section.rowBarCounts],
@@ -200,7 +196,6 @@ export function SectionEditorCard({
     nextRowBarCounts = rowBarCounts,
   ) => {
     const nextTab = renderTab(stringNames, nextBars);
-    console.log('[beatCount] commitChart - new tab length:', nextTab.length, 'first bar segment sample:', nextTab.split('\n')[0]?.slice(0, 30));
     onChange({
       tab: nextTab,
       rowAnnotations: nextRowAnnotations,
@@ -292,10 +287,6 @@ export function SectionEditorCard({
   };
 
   const beginRowEdit = (rowIndex: number) => {
-    console.log('[beatCount] beginRowEdit', {
-      rowIndex,
-      barCount: rowSlices[rowIndex]?.bars.length ?? 0,
-    });
     setRowEditSnapshot({
       tab: section.tab,
       rowAnnotations: section.rowAnnotations?.map((annotation) => ({ ...annotation })),
@@ -915,14 +906,6 @@ function RowEditor({
     [barPadding, cellGap, cellSize, row.bars],
   );
 
-  useEffect(() => {
-    console.log('[beatCount] RowEditor mounted', {
-      rowIndex: row.rowIndex,
-      rowStartBarIndex: row.startBarIndex,
-      rowBarCount: row.bars.length,
-      useMobileCellEditor,
-    });
-  }, [row.bars.length, row.rowIndex, row.startBarIndex, useMobileCellEditor]);
 
   useEffect(() => {
     if (!useMobileCellEditor) {
@@ -1195,17 +1178,7 @@ function RowEditor({
     const globalBarIndex = row.startBarIndex + rowBarIndex;
     const targetBar = bars[globalBarIndex];
 
-    console.log('[beatCount] updateBarBeatCountAt called', {
-      rowBarIndex,
-      nextBeatCount,
-      normalizedNextBeatCount,
-      globalBarIndex,
-      currentBeatCount: targetBar ? getBarBeatCount(targetBar) : 'no bar',
-      targetBarExists: Boolean(targetBar),
-    });
-
     if (!targetBar || getBarBeatCount(targetBar) === normalizedNextBeatCount) {
-      console.log('[beatCount] early return - no change needed');
       return;
     }
 
@@ -1236,7 +1209,6 @@ function RowEditor({
       };
     });
 
-    console.log('[beatCount] calling onChartChange, bar beatCount will be', normalizedNextBeatCount);
     onChartChange(nextBars, rowAnnotations, rowBarCounts);
   };
 
@@ -1925,7 +1897,6 @@ function BarBeatCountField({
   collapseKey: string;
   onSelect: (value: number) => void;
 }) {
-  console.log('[beatCount] BarBeatCountField render', { value });
   const normalizedDefaultValue = normalizeBeatCount(defaultValue);
   const isCustomBeatCount = value !== normalizedDefaultValue;
   const [isExpanded, setIsExpanded] = useState(isCustomBeatCount);
@@ -1971,7 +1942,6 @@ function BarBeatCountField({
           <Pressable
             key={`beat-${beat}`}
             onPress={() => {
-              console.log('[beatCount] BarBeatCountField onPress', { beat, currentValue: value });
               onSelect(beat);
             }}
             style={[

@@ -116,7 +116,7 @@ export function SongMetaFields({
             label="Tuning"
             value={song.tuning}
             onChangeText={(value) => onFieldChange('tuning', value)}
-            options={tuningOptions as unknown as string[]}
+            options={tuningOptions}
             style={[styles.tuningField, compact && styles.tuningFieldCompact]}
             inputStyle={styles.tuningInput}
             disabled={lockMetadata}
@@ -133,7 +133,7 @@ interface FieldProps {
   onChangeText: (value: string) => void;
   compact?: boolean;
   keyboardType?: 'default' | 'numeric';
-  options?: string[];
+  options?: readonly string[];
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
   disabled?: boolean;

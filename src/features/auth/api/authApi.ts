@@ -5,6 +5,7 @@ import type {
   LogoutResponse,
   RegisterRequest,
   RegisterResponse,
+  ResendVerificationRequest,
   ResetPasswordRequest,
   SessionResponse,
   UserDto,
@@ -16,6 +17,7 @@ type AuthAction =
   | 'session'
   | 'register'
   | 'verifyEmail'
+  | 'resendVerification'
   | 'login'
   | 'forgotPassword'
   | 'resetPassword'
@@ -195,6 +197,13 @@ export class AuthApi {
     });
     logAuthPayloadShape('login', responsePayload);
     return this.parseAuthenticated(responsePayload, 'login');
+  }
+
+  async resendVerification(payload: ResendVerificationRequest): Promise<void> {
+    await this.requestJson('resendVerification', '/v1/auth/resend-verification', {
+      method: 'POST',
+      body: payload,
+    });
   }
 
   async forgotPassword(payload: ForgotPasswordRequest): Promise<void> {

@@ -5,6 +5,7 @@ type AuthAction =
   | 'register'
   | 'login'
   | 'forgotPassword'
+  | 'resendVerification'
   | 'verifyEmail'
   | 'resetPassword'
   | 'logout';
@@ -64,6 +65,14 @@ export const toAuthErrorMessage = (action: AuthAction, error: unknown): string =
     }
 
     return 'We could not sign you in right now.';
+  }
+
+  if (action === 'resendVerification') {
+    if (error.code === 'RATE_LIMITED' || error.status === 429) {
+      return 'Too many attempts. Try again in a minute.';
+    }
+
+    return 'We could not send the verification email right now.';
   }
 
   if (action === 'forgotPassword') {

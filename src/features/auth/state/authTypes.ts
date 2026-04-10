@@ -15,6 +15,7 @@ export type AuthLoadingAction =
   | 'login'
   | 'register'
   | 'forgotPassword'
+  | 'resendVerification'
   | 'verifyEmail'
   | 'resetPassword'
   | 'logout';

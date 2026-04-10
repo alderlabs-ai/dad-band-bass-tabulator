@@ -112,7 +112,13 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     setInfo(null);
   };
 
-  const login = async ({ rawEmail, rawPassword }: { rawEmail: string; rawPassword: string }) => {
+  const login = async ({
+    rawEmail,
+    rawPassword,
+  }: {
+    rawEmail: string;
+    rawPassword: string;
+  }): Promise<{ errorCode: string } | undefined> => {
     bumpAuthFlowVersion();
     const email = normalizeEmail(rawEmail);
     const password = rawPassword;
@@ -149,6 +155,8 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
         error: error instanceof Error ? error.message : String(error),
       });
       setError(toAuthErrorMessage('login', error));
+      const errorCode = error instanceof AuthApiError ? (error.code ?? '') : '';
+      return { errorCode };
     } finally {
       dispatch({ type: 'setLoading', loadingAction: null });
     }
@@ -209,6 +217,33 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
         error: error instanceof Error ? error.message : String(error),
       });
       setError(toAuthErrorMessage('register', error));
+    } finally {
+      dispatch({ type: 'setLoading', loadingAction: null });
+    }
+  };
+
+  const resendVerification = async ({ rawEmail }: { rawEmail: string }) => {
+    bumpAuthFlowVersion();
+    const email = normalizeEmail(rawEmail);
+    syncDrafts({ email });
+    setError(null);
+    setInfo(null);
+
+    if (!isValidEmail(email)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+
+    dispatch({ type: 'setLoading', loadingAction: 'resendVerification' });
+
+    try {
+      await requireApi().resendVerification({ email });
+      setInfo(`Check ${email} for your verification link.`);
+    } catch (error) {
+      logClientEvent('warn', 'auth.resend_verification_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setError(toAuthErrorMessage('resendVerification', error));
     } finally {
       dispatch({ type: 'setLoading', loadingAction: null });
     }
@@ -361,6 +396,7 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     setAuthView,
     login,
     register,
+    resendVerification,
     forgotPassword,
     verifyEmail,
     resetPassword,

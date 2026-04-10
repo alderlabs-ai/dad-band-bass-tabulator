@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { palette } from '../../../constants/colors';
 import { RootStackParamList } from '../../../navigation/types';
+import { isValidEmail } from '../utils/email';
 import { useAuth } from '../state/useAuth';
 import { authScreenStyles as styles } from './authScreenStyles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerifyEmail'>;
 
 export function VerifyEmailScreen({ route, navigation }: Props) {
-  const { authState, errorMessage, loadingAction, verifyEmail, clearError, setAuthView } = useAuth();
+  const { authState, errorMessage, infoMessage, loadingAction, verifyEmail, resendVerification, clearError, setAuthView } = useAuth();
   const [attempt, setAttempt] = useState(0);
+  const [resendEmail, setResendEmail] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const resendEmailIsValid = isValidEmail(resendEmail.trim().toLowerCase());
+  const isResending = loadingAction === 'resendVerification';
   const fallbackTokenFromUrl = useMemo(() => {
     if (
       typeof globalThis === 'undefined' ||
@@ -105,12 +110,56 @@ export function VerifyEmailScreen({ route, navigation }: Props) {
             />
             <PrimaryButton
               variant="ghost"
+              label="Send me a new link"
+              onPress={() => {
+                clearError();
+                setShowResend(true);
+              }}
+            />
+            <PrimaryButton
+              variant="ghost"
               label="Back to Sign In"
               onPress={() => {
                 setAuthView('LOGIN');
                 navigation.replace('AuthEntry');
               }}
             />
+          </View>
+        ) : null}
+
+        {showResend && !isAuthenticated ? (
+          <View style={styles.actions}>
+            {infoMessage ? (
+              <Text style={[styles.successText, styles.centeredBody]}>{infoMessage}</Text>
+            ) : (
+              <>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  autoComplete="email"
+                  placeholder="your@email.com"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  value={resendEmail}
+                  onChangeText={setResendEmail}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (resendEmailIsValid) {
+                      void resendVerification({ rawEmail: resendEmail });
+                    }
+                  }}
+                />
+                <PrimaryButton
+                  label={isResending ? 'Sending...' : 'Send verification email'}
+                  onPress={() => {
+                    void resendVerification({ rawEmail: resendEmail });
+                  }}
+                  disabled={isResending || !resendEmailIsValid}
+                />
+              </>
+            )}
           </View>
         ) : null}
       </View>
