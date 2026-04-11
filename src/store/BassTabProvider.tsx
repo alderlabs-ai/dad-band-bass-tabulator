@@ -339,7 +339,33 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     if (failedCount > 0) {
       console.warn(`[BassTab] hydrateFromBackend: ${failedCount} of ${songResults.length} songs failed to load`);
     }
-    const nextSongs = songResults.flatMap((r) => (r.status === 'fulfilled' ? [fromSongDto(r.value)] : []));
+    const nextSongs = songResults.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return fromSongDto(result.value);
+      }
+
+      const metadata = songsMetadata[index];
+      const fallbackStringCount = Number.isFinite(metadata.stringCount) && metadata.stringCount > 0
+        ? metadata.stringCount
+        : FREE_PLAN_LIMITS.strings;
+
+      console.warn(
+        `[BassTab] hydrateFromBackend: using metadata fallback for song ${metadata.id} (${metadata.title})`,
+      );
+
+      return {
+        id: metadata.id,
+        title: metadata.title,
+        artist: metadata.artist,
+        key: metadata.key,
+        tuning: metadata.tuning,
+        updatedAt: metadata.updatedAt,
+        stringCount: fallbackStringCount,
+        stringNames: buildDefaultStringNames(fallbackStringCount),
+        rows: [],
+        importedPublishedSongId: metadata.importedPublishedSongId ?? null,
+      };
+    });
     const knownSongIds = new Set(nextSongs.map((song) => song.id));
     const playlist = fromPlaylistDto(playlistDto);
     const normalizedPlaylist = normalizeSetlist(sanitizeSetlistSongIds(playlist, knownSongIds));
