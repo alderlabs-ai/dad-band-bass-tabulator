@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import { Circle, Svg, Text as SvgText } from 'react-native-svg';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -20,6 +20,7 @@ import { RootStackParamList, TabParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { Song } from '../types/models';
 import { usePublishedSongLookup, PublishedSongInfo } from '../hooks/usePublishedSongLookup';
+import { logClientEvent } from '../utils/clientTelemetry';
 
 const NAMEPLATE_BG = '#1a120a';
 const NAMEPLATE_TEXT = '#f5e6c8';
@@ -90,6 +91,7 @@ export function LibraryScreen({ navigation }: Props) {
     title: string;
   } | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const lastStateSignatureRef = useRef<string>('');
 
   const filteredSongs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -105,6 +107,25 @@ export function LibraryScreen({ navigation }: Props) {
         .includes(normalized),
     );
   }, [query, songs]);
+
+  useEffect(() => {
+    const payload = {
+      authState: authState.type,
+      songsCount: songs.length,
+      filteredSongsCount: filteredSongs.length,
+      queryLength: query.length,
+      firstSongId: songs[0]?.id ?? null,
+      firstFilteredSongId: filteredSongs[0]?.id ?? null,
+    };
+    const signature = JSON.stringify(payload);
+
+    if (lastStateSignatureRef.current === signature) {
+      return;
+    }
+
+    lastStateSignatureRef.current = signature;
+    logClientEvent('info', 'library.render_state', payload);
+  }, [authState.type, filteredSongs, query.length, songs]);
 
   const handleCreateSong = async () => {
     try {
