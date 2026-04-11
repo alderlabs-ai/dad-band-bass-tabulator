@@ -23,6 +23,17 @@ type AuthAction =
   | 'resetPassword'
   | 'logout';
 
+const authRequestTimeoutMs: Record<AuthAction, number> = {
+  session: 5000,
+  register: 15000,
+  verifyEmail: 15000,
+  resendVerification: 15000,
+  login: 15000,
+  forgotPassword: 15000,
+  resetPassword: 15000,
+  logout: 5000,
+};
+
 interface AuthApiOptions {
   baseUrl: string;
 }
@@ -274,6 +285,18 @@ export class AuthApi {
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     };
+    const timeoutMs = authRequestTimeoutMs[action];
+    const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutHandle =
+      abortController && typeof globalThis.setTimeout === 'function'
+        ? globalThis.setTimeout(() => {
+          abortController.abort();
+        }, timeoutMs)
+        : null;
+
+    if (abortController) {
+      requestInit.signal = abortController.signal;
+    }
 
     logClientEvent('info', 'auth.fetch_start', {
       action,
@@ -295,7 +318,13 @@ export class AuthApi {
         ok: response.ok,
       });
     } catch (error) {
+      if (timeoutHandle !== null) {
+        globalThis.clearTimeout(timeoutHandle);
+      }
       const detail = error instanceof Error ? error.message : String(error);
+      const isTimeout =
+        error instanceof Error &&
+        (error.name === 'AbortError' || detail.toLowerCase().includes('aborted'));
       logClientEvent('error', 'auth.fetch_error', {
         action,
         url,
@@ -303,7 +332,14 @@ export class AuthApi {
         error: detail,
         name: error instanceof Error ? error.name : 'UnknownError',
       });
+      if (isTimeout) {
+        throw new AuthApiError(`Network request timed out after ${timeoutMs}ms.`, undefined, action, 'REQUEST_TIMEOUT');
+      }
       throw new AuthApiError(`Network request failed: ${detail}`, undefined, action);
+    } finally {
+      if (timeoutHandle !== null) {
+        globalThis.clearTimeout(timeoutHandle);
+      }
     }
 
     if (!response.ok) {

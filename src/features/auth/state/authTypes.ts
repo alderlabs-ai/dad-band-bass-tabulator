@@ -17,8 +17,7 @@ export type AuthLoadingAction =
   | 'forgotPassword'
   | 'resendVerification'
   | 'verifyEmail'
-  | 'resetPassword'
-  | 'logout';
+  | 'resetPassword';
 
 export interface AuthStoreState {
   authState: AuthState;

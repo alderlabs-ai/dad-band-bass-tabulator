@@ -209,9 +209,8 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
       logClientEvent('info', 'auth.register_succeeded', {
         handle,
       });
-      dispatch({ type: 'setAuthView', authView: 'LOGIN' });
       dispatch({ type: 'setDraftCredentials', password: '' });
-      setInfo(`Check ${response.maskedEmail} for your verification link.`);
+      return { email, maskedEmail: response.maskedEmail };
     } catch (error) {
       logClientEvent('warn', 'auth.register_failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -238,7 +237,7 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
 
     try {
       await requireApi().resendVerification({ email });
-      setInfo(`Check ${email} for your verification link.`);
+      setInfo(`A new code has been sent to ${email}.`);
     } catch (error) {
       logClientEvent('warn', 'auth.resend_verification_failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -273,22 +272,21 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     }
   };
 
-  const verifyEmail = async (token: string): Promise<{ errorCode: string } | undefined> => {
+  const verifyEmail = async ({ email, code }: { email: string; code: string }): Promise<{ errorCode: string } | undefined> => {
     bumpAuthFlowVersion();
-    const trimmedToken = token.trim();
+    const trimmedCode = code.trim();
     setError(null);
     setInfo(null);
 
-    if (!trimmedToken) {
-      dispatch({ type: 'setUnauthenticated' });
-      setError('This verification link is invalid or has expired.');
-      return { errorCode: 'INVALID_OR_EXPIRED_TOKEN' };
+    if (!trimmedCode) {
+      setError('Enter the 6-digit code from your email.');
+      return { errorCode: 'MISSING_CODE' };
     }
 
     dispatch({ type: 'setLoading', loadingAction: 'verifyEmail' });
 
     try {
-      const response = await requireApi().verifyEmail({ token: trimmedToken });
+      const response = await requireApi().verifyEmail({ email, code: trimmedCode });
       dispatch({ type: 'setAuthenticated', user: response.user });
       syncDrafts({
         email: response.user.email,
@@ -343,36 +341,32 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     }
   };
 
-  const logout = async () => {
+  const logout = () => {
     bumpAuthFlowVersion();
     const current = getState().authState;
     const fallbackEmail = current.type === 'AUTHENTICATED' ? current.user.email : getState().draftEmail;
     const fallbackHandle = current.type === 'AUTHENTICATED' ? current.user.userId : getState().draftHandle;
 
-    dispatch({ type: 'setLoading', loadingAction: 'logout' });
+    // Clear auth state immediately — don't wait for the server.
+    syncDrafts({
+      email: fallbackEmail,
+      password: '',
+      handle: fallbackHandle,
+      avatarUrl: current.type === 'AUTHENTICATED' ? (current.user.avatarUrl ?? '') : getState().draftAvatarUrl,
+    });
     setError(null);
     setInfo(null);
+    dispatch({ type: 'setUnauthenticated' });
 
-    try {
-      if (api) {
-        await api.logout();
-      }
-    } catch (error) {
-      console.warn('Auth logout failed', error);
-      setError(toAuthErrorMessage('logout', error));
-    } finally {
-      syncDrafts({
-        email: fallbackEmail,
-        password: '',
-        handle: fallbackHandle,
-        avatarUrl: current.type === 'AUTHENTICATED' ? (current.user.avatarUrl ?? '') : getState().draftAvatarUrl,
+    // Fire-and-forget server-side session invalidation.
+    if (api) {
+      api.logout().catch((error) => {
+        console.warn('Auth logout server call failed', error);
       });
-      dispatch({ type: 'setUnauthenticated' });
-      dispatch({ type: 'setLoading', loadingAction: null });
     }
   };
 
-  const updateLocalProfile = (updates: { avatarUrl?: string | null }) => {
+  const updateLocalProfile = (updates: { avatarUrl?: string | null; email?: string }) => {
     const current = getState().authState;
 
     if (current.type !== 'AUTHENTICATED') {
@@ -382,6 +376,7 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     const nextUser = {
       ...current.user,
       ...(updates.avatarUrl !== undefined ? { avatarUrl: updates.avatarUrl } : {}),
+      ...(updates.email !== undefined ? { email: updates.email } : {}),
     };
 
     dispatch({ type: 'setAuthenticated', user: nextUser });

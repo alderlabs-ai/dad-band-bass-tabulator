@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette } from '../constants/colors';
 import { brandDisplayFontFamily } from '../constants/typography';
 import { AuthEntryScreen } from '../features/auth/components/AuthEntryScreen';
-import { AuthRestoringScreen } from '../features/auth/components/AuthRestoringScreen';
 import { ResetPasswordScreen } from '../features/auth/components/ResetPasswordScreen';
 import { VerifyEmailScreen } from '../features/auth/components/VerifyEmailScreen';
 import { useAuth } from '../features/auth/state/useAuth';
@@ -45,25 +44,48 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 function ProtectedRedirectScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { authState } = useAuth();
 
   useEffect(() => {
+    if (authState.type === 'RESTORING_SESSION') {
+      return;
+    }
+
+    if (authState.type === 'AUTHENTICATED') {
+      navigation.replace('MainTabs', { screen: 'Library' });
+      return;
+    }
+
     navigation.replace('AuthEntry', {
       view: 'LOGIN',
       source: 'protected-route',
     });
-  }, [navigation]);
+  }, [authState.type, navigation]);
 
-  return <AuthRestoringScreen />;
+  return null;
 }
 
 function AuthenticatedRedirectScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { authState } = useAuth();
 
   useEffect(() => {
-    navigation.replace('MainTabs', { screen: 'Library' });
-  }, [navigation]);
+    if (authState.type === 'RESTORING_SESSION') {
+      return;
+    }
 
-  return <AuthRestoringScreen />;
+    if (authState.type === 'AUTHENTICATED') {
+      navigation.replace('MainTabs', { screen: 'Library' });
+      return;
+    }
+
+    navigation.replace('AuthEntry', {
+      view: 'LOGIN',
+      source: 'authenticated-route',
+    });
+  }, [authState.type, navigation]);
+
+  return null;
 }
 
 function MainTabs() {
@@ -147,9 +169,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [webOrigin, 'basstab://'].filter(Boolean),
   config: {
     screens: {
-      Landing: '',
       AuthEntry: 'auth',
-      VerifyEmail: 'auth/verify-email',
       ResetPassword: 'auth/reset-password',
       MainTabs: {
         path: 'MainTabs',
@@ -162,10 +182,19 @@ export const linking: LinkingOptions<RootStackParamList> = {
       SongEditor: 'song/:songId',
       PerformanceView: 'performance/:songId',
       ExportSong: 'export/:songId',
+      Landing: '',
     },
   },
   getStateFromPath: (path, options) => {
     const normalizedPath = path?.replace('/MainTabs/MainTabs/', '/MainTabs/') ?? path;
+    const trimmedPath = (normalizedPath ?? '').replace(/^\/+/, '');
+
+    if (trimmedPath.startsWith('auth/reset-password')) {
+      return {
+        routes: [{ name: 'ResetPassword' }],
+      };
+    }
+
     return getNativeStateFromPath(normalizedPath, options);
   },
 };
@@ -173,13 +202,8 @@ export const linking: LinkingOptions<RootStackParamList> = {
 export function AppNavigator() {
   const { authState } = useAuth();
   const { loadStateFromFile } = useBassTab();
-  const isRestoring = authState.type === 'RESTORING_SESSION';
   const isAuthenticated = authState.type === 'AUTHENTICATED';
-  const initialRouteName: keyof RootStackParamList = isRestoring
-    ? 'AuthRestoring'
-    : isAuthenticated
-      ? 'MainTabs'
-      : 'Landing';
+  const initialRouteName: keyof RootStackParamList = 'Landing';
   const hydratedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -201,7 +225,6 @@ export function AppNavigator() {
   return (
     <NavigationContainer theme={defaultTheme} linking={linking}>
       <Stack.Navigator
-        key={isAuthenticated ? 'app' : 'public'}
         initialRouteName={initialRouteName}
         screenOptions={{
           contentStyle: { backgroundColor: palette.background },
@@ -214,16 +237,7 @@ export function AppNavigator() {
           },
         }}
       >
-        {isRestoring ? (
-          <Stack.Screen
-            name="AuthRestoring"
-            component={AuthRestoringScreen}
-            options={{ headerShown: false }}
-          />
-        ) : null}
-
-        {!isRestoring ? (
-          <>
+        <>
             <Stack.Screen
               name="Landing"
               component={LandingScreen}
@@ -261,7 +275,7 @@ export function AppNavigator() {
                 <Stack.Screen
                   name="Account"
                   component={AccountScreen}
-                  options={{ title: 'BassTab Account' }}
+                  options={{ headerShown: false }}
                 />
                 <Stack.Screen
                   name="Upgrade"
@@ -352,8 +366,7 @@ export function AppNavigator() {
                 <Stack.Screen name="ImportPaste" component={ProtectedRedirectScreen} options={{ headerShown: false }} />
               </>
             )}
-          </>
-        ) : null}
+        </>
 
         <Stack.Screen
           name="VerifyEmail"

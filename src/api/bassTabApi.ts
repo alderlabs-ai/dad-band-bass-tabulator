@@ -5,7 +5,11 @@ import {
   CommunitySongVotesDto,
   AiGenerateSongRequestDto,
   CreateSongRequestDto,
+  EmailChangeStartResponse,
+  EmailChangeVerifyResponse,
   MockUpgradeRequestDto,
+  parseEmailChangeStartResponse,
+  parseEmailChangeVerifyResponse,
   parsePlaylistDto,
   parseCommunitySongCardListDto,
   parseCommunitySongCardDto,
@@ -68,6 +72,8 @@ export interface BassTabApi {
   clearCommunitySongVote(songId: string): Promise<CommunitySongVotesDto>;
   adoptCommunitySong(publishedSongId: string): Promise<CommunitySongCardDto>;
   disownCommunitySong(publishedSongId: string): Promise<void>;
+  startEmailChange(newEmail: string): Promise<EmailChangeStartResponse>;
+  verifyEmailChange(newEmail: string, code: string): Promise<EmailChangeVerifyResponse>;
 }
 
 export interface BassTabApiClientOptions {
@@ -429,6 +435,30 @@ export class HttpBassTabApi implements BassTabApi {
         body: JSON.stringify({}),
       },
       () => undefined,
+    );
+  }
+
+  async startEmailChange(newEmail: string): Promise<EmailChangeStartResponse> {
+    return this.request(
+      '/v1/me/email/change/start',
+      {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify({ newEmail }),
+      },
+      parseEmailChangeStartResponse,
+    );
+  }
+
+  async verifyEmailChange(newEmail: string, code: string): Promise<EmailChangeVerifyResponse> {
+    return this.request(
+      '/v1/me/email/change/verify',
+      {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify({ newEmail, code }),
+      },
+      parseEmailChangeVerifyResponse,
     );
   }
 

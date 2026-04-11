@@ -952,3 +952,36 @@ export const parseCommunitySavedSongsDto = (value: unknown): CommunitySavedSongD
 export const parseCommunitySongVotesDto = (value: unknown): CommunitySongVotesDto => {
   return toCommunitySongVotesDto(value);
 };
+
+// ---------------------------------------------------------------------------
+// Email change
+// ---------------------------------------------------------------------------
+
+export interface EmailChangeStartResponse {
+  status: 'EMAIL_SENT';
+  maskedEmail: string;
+  nextAllowedResendAt: string;
+}
+
+export interface EmailChangeVerifyResponse {
+  email: string;
+}
+
+export const parseEmailChangeStartResponse = (value: unknown): EmailChangeStartResponse => {
+  const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+  const maskedEmail = typeof record?.maskedEmail === 'string' ? record.maskedEmail : '';
+  const nextAllowedResendAt = typeof record?.nextAllowedResendAt === 'string' ? record.nextAllowedResendAt : new Date(Date.now() + 60_000).toISOString();
+
+  return { status: 'EMAIL_SENT', maskedEmail, nextAllowedResendAt };
+};
+
+export const parseEmailChangeVerifyResponse = (value: unknown): EmailChangeVerifyResponse => {
+  const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+  const email = typeof record?.email === 'string' ? record.email : null;
+
+  if (!email) {
+    throw new Error('Invalid email change verify response: missing email.');
+  }
+
+  return { email };
+};

@@ -116,7 +116,7 @@ const run = async () => {
       }),
     });
 
-    await harness.actions.verifyEmail('token-123');
+    await harness.actions.verifyEmail({ email: 'anne@example.com', code: '123456' });
 
     if (harness.getState().authState.type !== 'AUTHENTICATED') {
       throw new Error('Expected AUTHENTICATED state after verifyEmail.');
@@ -172,7 +172,7 @@ const run = async () => {
       },
     });
 
-    await harness.actions.verifyEmail('token-456');
+    await harness.actions.verifyEmail({ email: 'anne@example.com', code: '654321' });
     await harness.actions.logout();
 
     const state = harness.getState();

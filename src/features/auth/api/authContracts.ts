@@ -25,7 +25,8 @@ export interface RegisterResponse {
 }
 
 export interface VerifyEmailRequest {
-  token: string;
+  email: string;
+  code: string;
 }
 
 export interface LoginRequest {

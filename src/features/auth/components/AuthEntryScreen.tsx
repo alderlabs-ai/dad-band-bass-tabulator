@@ -36,7 +36,13 @@ export function AuthEntryScreen({ navigation, route }: Props) {
   }, [authView, navigation, requestedView, setAuthView]);
 
   if (authView === 'REGISTER') {
-    return <RegisterScreen />;
+    return (
+      <RegisterScreen
+        onRegistered={(maskedEmail) => {
+          navigation.navigate('VerifyEmail', { maskedEmail });
+        }}
+      />
+    );
   }
 
   if (authView === 'FORGOT_PASSWORD') {

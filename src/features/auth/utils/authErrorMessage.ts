@@ -17,7 +17,7 @@ export const toAuthErrorMessage = (action: AuthAction, error: unknown): string =
 
   if (!(error instanceof AuthApiError)) {
     if (action === 'verifyEmail') {
-      return 'We could not verify that email link right now.';
+      return 'We could not verify that code right now.';
     }
 
     if (action === 'resetPassword') {
@@ -89,14 +89,14 @@ export const toAuthErrorMessage = (action: AuthAction, error: unknown): string =
     }
 
     if (error.code === 'INVALID_OR_EXPIRED_TOKEN' || error.status === 400 || error.status === 401) {
-      return 'This link has expired.';
+      return 'Incorrect or expired code. Request a new one.';
     }
 
     if (error.code === 'RATE_LIMITED' || error.status === 429) {
       return 'Too many attempts. Try again in a minute.';
     }
 
-    return 'We could not verify that email link right now.';
+    return 'We could not verify that code right now.';
   }
 
   if (action === 'resetPassword') {

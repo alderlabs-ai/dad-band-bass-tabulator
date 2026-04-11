@@ -169,6 +169,7 @@ export function SetlistScreen({ navigation }: Props) {
             onImport={() => navigation.navigate('Import')}
             onAICreate={() => navigation.navigate('AICreate')}
             onGoPro={() => navigation.navigate('Upgrade')}
+            onAccount={() => navigation.navigate('Account')}
           />
         </View>
 

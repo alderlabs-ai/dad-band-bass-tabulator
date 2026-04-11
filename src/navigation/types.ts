@@ -15,7 +15,7 @@ export type RootStackParamList = {
       source?: string;
     }
     | undefined;
-  VerifyEmail: { token?: string } | undefined;
+  VerifyEmail: { maskedEmail?: string } | undefined;
   ResetPassword: { token?: string } | undefined;
   Home: undefined;
   Landing: undefined;

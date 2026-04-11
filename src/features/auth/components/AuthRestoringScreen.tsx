@@ -9,7 +9,7 @@ export function AuthRestoringScreen() {
     <ScreenContainer scroll={false} contentStyle={styles.container}>
       <View style={styles.card}>
         <ActivityIndicator color={palette.primary} size="small" />
-        <Text style={styles.title}>Opening BassTab...</Text>
+        <Text style={styles.title}>Opening Dad Band Bass...</Text>
         <Text style={styles.subtitle}>Checking your session.</Text>
       </View>
     </ScreenContainer>

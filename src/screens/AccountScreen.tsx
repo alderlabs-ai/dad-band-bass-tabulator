@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Linking } from 'react-native';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Circle, Svg, Text as SvgText } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -9,32 +8,22 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { palette } from '../constants/colors';
 import { brandDisplayFontFamily } from '../constants/typography';
-import { BassTabApiError } from '../api';
+import { BassTabApiError, createBassTabApiFromEnv } from '../api';
+import { useAuth } from '../features/auth/state/useAuth';
+import { avatarPresetValue, avatarPresets, findAvatarPreset } from '../features/auth/utils/avatarPresets';
+import { isValidEmail } from '../features/auth/utils/email';
 import { useSubscription } from '../features/subscription';
 import { subscriptionService } from '../features/subscription/subscriptionService';
 import { RootStackParamList } from '../navigation/types';
 
 // ---------------------------------------------------------------------------
-// Branding constants (shared pattern across all Dad Band screens)
+// Branding
 // ---------------------------------------------------------------------------
 const NAMEPLATE_BG = '#1a120a';
 const NAMEPLATE_TEXT = '#f5e6c8';
 const NAMEPLATE_MUTED = '#a8957e';
 const NAMEPLATE_GOLD = '#c8a96e';
 
-// ---------------------------------------------------------------------------
-// Cancel state machine
-//   idle        → normal, cancel button visible
-//   confirming  → modal open, awaiting user decision
-//   submitting  → API call in flight, buttons disabled
-//   scheduled   → cancellation confirmed; Pro active until period end
-//   error       → request failed; surface message, allow retry
-// ---------------------------------------------------------------------------
-type CancelState = 'idle' | 'confirming' | 'submitting' | 'error';
-
-// ---------------------------------------------------------------------------
-// Badge
-// ---------------------------------------------------------------------------
 function DadBandBadge() {
   return (
     <Svg width={80} height={80} viewBox="0 0 120 120">
@@ -48,13 +37,132 @@ function DadBandBadge() {
 }
 
 // ---------------------------------------------------------------------------
+// Cancel state machine
+// ---------------------------------------------------------------------------
+type CancelState = 'idle' | 'confirming' | 'submitting' | 'error';
+
+// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 type Props = NativeStackScreenProps<RootStackParamList, 'Account'>;
 
 export function AccountScreen({ navigation }: Props) {
-  const { tier, status, currentPeriodEnd, cancelAtPeriodEnd, refresh } = useSubscription();
+  const { authState, loadingAction, updateLocalProfile } = useAuth();
+  const { tier, status, currentPeriodEnd, cancelAtPeriodEnd, refresh, priceLabel } = useSubscription();
+  const api = useMemo(() => createBassTabApiFromEnv(), []);
 
+  // Profile state
+  const signedInUser = authState.type === 'AUTHENTICATED' ? authState.user : null;
+  const signedInUserId = signedInUser?.userId ?? null;
+  const signedInEmail = signedInUser?.email ?? '';
+  const currentAvatarUrl = signedInUser?.avatarUrl ?? '';
+  const avatarInitial = (signedInUserId ?? 'b').slice(0, 1).toUpperCase();
+
+  const [emailDraft, setEmailDraft] = useState('');
+  const [avatarDraft, setAvatarDraft] = useState('');
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  // Email change flow
+  type EmailChangeStep = 'idle' | 'pending';
+  const [emailChangeStep, setEmailChangeStep] = useState<EmailChangeStep>('idle');
+  const [emailChangeLoading, setEmailChangeLoading] = useState<'start' | 'verify' | null>(null);
+  const [pendingNewEmail, setPendingNewEmail] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [nextResendAt, setNextResendAt] = useState<Date | null>(null);
+  const [emailChangeCode, setEmailChangeCode] = useState('');
+  const [emailChangeError, setEmailChangeError] = useState<string | null>(null);
+
+  const canResend = !nextResendAt || Date.now() >= nextResendAt.getTime();
+
+  const handleStartEmailChange = async () => {
+    if (!canRequestEmailChange || emailChangeLoading) return;
+    setEmailChangeError(null);
+    setEmailChangeLoading('start');
+    try {
+      const result = await api!.startEmailChange(normalizedEmailDraft);
+      setPendingNewEmail(normalizedEmailDraft);
+      setMaskedEmail(result.maskedEmail);
+      setNextResendAt(new Date(result.nextAllowedResendAt));
+      setEmailChangeCode('');
+      setEmailChangeStep('pending');
+    } catch (error) {
+      const code = error instanceof BassTabApiError ? error.code : undefined;
+      if (code === 'EMAIL_SAME_AS_CURRENT') {
+        setEmailChangeError("That's already your current email address.");
+      } else if (code === 'EMAIL_ALREADY_LINKED') {
+        setEmailChangeError('That email is already linked to another account.');
+      } else {
+        setEmailChangeError("Couldn't start email change. Please try again.");
+      }
+    } finally {
+      setEmailChangeLoading(null);
+    }
+  };
+
+  const handleVerifyEmailChange = async () => {
+    if (emailChangeLoading || emailChangeCode.trim().length !== 6) return;
+    setEmailChangeError(null);
+    setEmailChangeLoading('verify');
+    try {
+      const result = await api!.verifyEmailChange(pendingNewEmail, emailChangeCode);
+      updateLocalProfile({ email: result.email });
+      setEmailDraft(result.email);
+      setEmailChangeStep('idle');
+      setEmailChangeCode('');
+      setProfileMessage('Email updated successfully.');
+    } catch (error) {
+      const code = error instanceof BassTabApiError ? error.code : undefined;
+      if (code === 'INVALID_OR_EXPIRED_TOKEN') {
+        setEmailChangeError('Incorrect or expired code. Request a new one.');
+      } else if (code === 'EMAIL_ALREADY_LINKED') {
+        setEmailChangeError('That email is already linked to another account.');
+      } else {
+        setEmailChangeError("Couldn't verify the code. Please try again.");
+      }
+    } finally {
+      setEmailChangeLoading(null);
+    }
+  };
+
+  const handleResendEmailChange = async () => {
+    if (!canResend || emailChangeLoading) return;
+    setEmailChangeError(null);
+    setEmailChangeLoading('start');
+    try {
+      const result = await api!.startEmailChange(pendingNewEmail);
+      setMaskedEmail(result.maskedEmail);
+      setNextResendAt(new Date(result.nextAllowedResendAt));
+      setEmailChangeCode('');
+    } catch (error) {
+      setEmailChangeError("Couldn't resend the code. Please try again.");
+    } finally {
+      setEmailChangeLoading(null);
+    }
+  };
+
+  const normalizedEmailDraft = useMemo(() => emailDraft.trim().toLowerCase(), [emailDraft]);
+  const normalizedAvatarDraft = useMemo(() => avatarDraft.trim(), [avatarDraft]);
+  const emailChanged =
+    Boolean(signedInEmail) &&
+    normalizedEmailDraft.length > 0 &&
+    normalizedEmailDraft !== signedInEmail.trim().toLowerCase();
+  const canRequestEmailChange = emailChanged && isValidEmail(normalizedEmailDraft);
+  const avatarChanged = normalizedAvatarDraft !== currentAvatarUrl.trim();
+  const avatarPreset = findAvatarPreset(normalizedAvatarDraft);
+  const showAvatarImage =
+    !avatarPreset &&
+    (normalizedAvatarDraft.startsWith('http://') || normalizedAvatarDraft.startsWith('https://'));
+
+  useEffect(() => {
+    if (!signedInUser) return;
+    setEmailDraft(signedInUser.email);
+    setAvatarDraft(signedInUser.avatarUrl ?? '');
+    setProfileMessage(null);
+    setAvatarLoadFailed(false);
+  }, [signedInUser?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Subscription state
   const [cancelState, setCancelState] = useState<CancelState>('idle');
   const [cancelError, setCancelError] = useState('');
 
@@ -117,19 +225,18 @@ export function AccountScreen({ navigation }: Props) {
   return (
     <ScreenContainer>
       {/* Nav */}
-      <View style={styles.navRow}>
-        <AppSectionNav
-          current="GoPro"
-          onHome={() => navigation.navigate('Home')}
-          onLibrary={() => navigation.navigate('MainTabs', { screen: 'Library' })}
-          onSetlist={() => navigation.navigate('MainTabs', { screen: 'Setlist' })}
-          onImport={() => navigation.navigate('MainTabs', { screen: 'Import' })}
-          onAICreate={() => navigation.navigate('MainTabs', { screen: 'AICreate' })}
-          onGoPro={() => navigation.navigate('Upgrade')}
-        />
-      </View>
+      <AppSectionNav
+        current="Account"
+        onHome={() => navigation.navigate('Home')}
+        onLibrary={() => navigation.navigate('MainTabs', { screen: 'Library' })}
+        onSetlist={() => navigation.navigate('MainTabs', { screen: 'Setlist' })}
+        onImport={() => navigation.navigate('MainTabs', { screen: 'Import' })}
+        onAICreate={() => navigation.navigate('MainTabs', { screen: 'AICreate' })}
+        onGoPro={() => navigation.navigate('Upgrade')}
+        onAccount={() => {}}
+      />
 
-      {/* Dark nameplate banner */}
+      {/* Nameplate */}
       <View style={styles.nameplate}>
         <View style={styles.nameplateInner}>
           <View style={styles.nameplateText}>
@@ -145,24 +252,214 @@ export function AccountScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Subscription card */}
-      <View style={[styles.subscriptionCard, isProActive && styles.subscriptionCardPro]}>
-        <Text style={styles.sectionLabel}>The serious bit</Text>
+      {/* ------------------------------------------------------------------ */}
+      {/* Profile card                                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionLabel}>Profile</Text>
+
+        {/* Identity row */}
+        <View style={styles.profileRow}>
+          <View style={styles.avatarWrap}>
+            {showAvatarImage && !avatarLoadFailed ? (
+              <Image
+                source={{ uri: normalizedAvatarDraft }}
+                style={styles.avatarImage}
+                onError={() => setAvatarLoadFailed(true)}
+              />
+            ) : avatarPreset ? (
+              <View style={[styles.avatarFallback, { backgroundColor: avatarPreset.background }]}>
+                <Text style={[styles.avatarPresetGlyph, { color: avatarPreset.textColor }]}>
+                  {avatarPreset.glyph}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>{avatarInitial}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.profileCopy}>
+            <Text style={styles.profileUserId}>@{signedInUserId ?? 'unknown'}</Text>
+            <Text style={styles.profileHint}>{signedInEmail}</Text>
+          </View>
+          <View style={[styles.tierPill, isProActive ? styles.tierPillPro : styles.tierPillFree]}>
+            <Text style={[styles.tierPillText, isProActive ? styles.tierPillTextPro : styles.tierPillTextFree]}>
+              {tier}
+            </Text>
+          </View>
+        </View>
+
+        {/* Email */}
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>Email</Text>
+          {emailChangeStep === 'idle' ? (
+            <>
+              <TextInput
+                value={emailDraft}
+                onChangeText={(value) => {
+                  setEmailDraft(value);
+                  setEmailChangeError(null);
+                  setProfileMessage(null);
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+              />
+              {emailChangeError ? (
+                <View style={styles.errorBox}><Text style={styles.errorText}>{emailChangeError}</Text></View>
+              ) : null}
+              <PrimaryButton
+                label={emailChangeLoading === 'start' ? 'Sending...' : 'Request Change'}
+                onPress={() => { void handleStartEmailChange(); }}
+                variant="secondary"
+                size="compact"
+                style={styles.fieldButton}
+                disabled={!canRequestEmailChange || Boolean(emailChangeLoading)}
+              />
+            </>
+          ) : (
+            <>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>
+                  {'Code sent to '}
+                  <Text style={styles.infoTextBold}>{maskedEmail}</Text>
+                </Text>
+              </View>
+              <TextInput
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="000000"
+                placeholderTextColor="#94a3b8"
+                style={[styles.input, styles.codeInput]}
+                value={emailChangeCode}
+                onChangeText={(value) => {
+                  setEmailChangeCode(value.replace(/[^0-9]/g, ''));
+                  setEmailChangeError(null);
+                }}
+                returnKeyType="done"
+                onSubmitEditing={() => { void handleVerifyEmailChange(); }}
+                autoFocus
+              />
+              {emailChangeError ? (
+                <View style={styles.errorBox}><Text style={styles.errorText}>{emailChangeError}</Text></View>
+              ) : null}
+              {!canResend && nextResendAt ? (
+                <Text style={styles.resendHint}>
+                  Resend available after {nextResendAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              ) : null}
+              <View style={styles.emailChangeActions}>
+                <PrimaryButton
+                  label={emailChangeLoading === 'verify' ? 'Verifying...' : 'Confirm Change'}
+                  onPress={() => { void handleVerifyEmailChange(); }}
+                  variant="secondary"
+                  size="compact"
+                  disabled={Boolean(emailChangeLoading) || emailChangeCode.trim().length !== 6}
+                />
+                <PrimaryButton
+                  label={emailChangeLoading === 'start' ? 'Sending...' : 'Resend code'}
+                  onPress={() => { void handleResendEmailChange(); }}
+                  variant="ghost"
+                  size="compact"
+                  disabled={Boolean(emailChangeLoading) || !canResend}
+                />
+                <PrimaryButton
+                  label="Cancel"
+                  onPress={() => {
+                    setEmailChangeStep('idle');
+                    setEmailChangeError(null);
+                    setEmailChangeCode('');
+                  }}
+                  variant="ghost"
+                  size="compact"
+                />
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Avatar */}
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>Avatar</Text>
+          <Text style={styles.fieldHint}>Pick a preset or paste a public image URL (Gravatar, GitHub, Imgur, etc.).</Text>
+          <View style={styles.presetGrid}>
+            {avatarPresets.map((preset) => {
+              const isSelected = normalizedAvatarDraft === avatarPresetValue(preset.id);
+              return (
+                <Pressable
+                  key={preset.id}
+                  onPress={() => {
+                    setAvatarDraft(avatarPresetValue(preset.id));
+                    setAvatarLoadFailed(false);
+                    setProfileMessage(null);
+                  }}
+                  style={[styles.presetOption, isSelected && styles.presetOptionSelected]}
+                >
+                  <View style={[styles.presetBubble, { backgroundColor: preset.background }]}>
+                    <Text style={[styles.presetGlyph, { color: preset.textColor }]}>
+                      {preset.glyph}
+                    </Text>
+                  </View>
+                  <Text style={styles.presetName} numberOfLines={1}>{preset.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput
+            value={avatarDraft}
+            onChangeText={(value) => {
+              setAvatarDraft(value);
+              setAvatarLoadFailed(false);
+              setProfileMessage(null);
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="https://your-image-url.com/photo.jpg"
+            placeholderTextColor="#94a3b8"
+            style={styles.input}
+          />
+          <PrimaryButton
+            label="Save Avatar"
+            onPress={() => {
+              updateLocalProfile({ avatarUrl: normalizedAvatarDraft.length > 0 ? normalizedAvatarDraft : null });
+              setProfileMessage('Avatar updated.');
+            }}
+            variant="secondary"
+            size="compact"
+            style={styles.fieldButton}
+            disabled={!avatarChanged}
+          />
+        </View>
+
+        {profileMessage ? (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>{profileMessage}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Subscription card                                                    */}
+      {/* ------------------------------------------------------------------ */}
+      <View style={[styles.sectionCard, isProActive && styles.subscriptionCardPro]}>
+        <Text style={styles.sectionLabel}>Subscription</Text>
 
         {isProActive ? (
           <>
-            {/* Plan identity */}
             <View style={styles.proBadge}>
               <Text style={styles.proBadgeText}>PRO</Text>
             </View>
-            <Text style={styles.planTitle}>You're on Pro 🎸</Text>
+            <Text style={styles.planTitle}>You're on Pro</Text>
             <Text style={styles.planText}>
               All features unlocked. What you do with it is up to you.
             </Text>
 
             <View style={styles.divider} />
 
-            {/* Billing detail rows */}
             <View style={styles.billingTable}>
               <View style={styles.billingRow}>
                 <Text style={styles.billingLabel}>Plan</Text>
@@ -182,7 +479,6 @@ export function AccountScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {/* Post-cancel success note */}
             {isCancelled ? (
               <View style={styles.successBox}>
                 <Text style={styles.successText}>
@@ -191,14 +487,12 @@ export function AccountScreen({ navigation }: Props) {
               </View>
             ) : null}
 
-            {/* Inline error */}
             {cancelState === 'error' && cancelError ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{cancelError}</Text>
               </View>
             ) : null}
 
-            {/* Billing actions */}
             <View style={styles.billingActions}>
               <PrimaryButton
                 label="Manage billing"
@@ -218,10 +512,11 @@ export function AccountScreen({ navigation }: Props) {
           </>
         ) : (
           <>
-            <Text style={styles.planTitle}>You're on the Free Plan</Text>
+            <Text style={styles.planTitle}>Free Plan</Text>
             <Text style={styles.planText}>
               Upgrade for unlimited songs and setlists, SVG performance mode, and full community access.
             </Text>
+            <Text style={styles.priceLine}>{priceLabel}/month — cheaper than new strings.</Text>
             <PrimaryButton
               label="Upgrade to Pro"
               onPress={() => navigation.navigate('Upgrade')}
@@ -230,13 +525,7 @@ export function AccountScreen({ navigation }: Props) {
         )}
       </View>
 
-      {isProActive && !isCancelled ? (
-        <Text style={styles.microcopy}>Cheaper than new strings.</Text>
-      ) : null}
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Cancellation confirmation modal                                      */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Cancellation confirmation modal */}
       <Modal
         visible={modalVisible}
         transparent
@@ -277,10 +566,6 @@ export function AccountScreen({ navigation }: Props) {
 // Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  navRow: {
-    marginBottom: 0,
-  },
-
   // Nameplate
   nameplate: {
     backgroundColor: NAMEPLATE_BG,
@@ -336,13 +621,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  // Subscription card
-  subscriptionCard: {
-    borderRadius: 20,
+  // Shared card
+  sectionCard: {
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.surface,
-    padding: 18,
+    padding: 16,
     gap: 12,
   },
   subscriptionCardPro: {
@@ -350,74 +635,187 @@ const styles = StyleSheet.create({
     backgroundColor: '#eff6ff',
   },
   sectionLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    fontWeight: '700',
-    color: palette.textMuted,
-  },
-  proBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#1e3a8a',
-  },
-  proBadgeText: {
     fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: '#dbeafe',
-  },
-  planTitle: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '800',
-    color: palette.text,
-  },
-  planText: {
-    fontSize: 15,
-    lineHeight: 22,
+    letterSpacing: 0.8,
+    fontWeight: '700',
     color: palette.textMuted,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(29, 78, 216, 0.18)',
-    marginVertical: 2,
   },
 
-  // Billing detail table
-  billingTable: {
-    gap: 8,
-  },
-  billingRow: {
+  // Profile row
+  profileRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
-  billingLabel: {
-    fontSize: 13,
+  avatarWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f766e',
+  },
+  avatarFallbackText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#f8fafc',
+  },
+  avatarPresetGlyph: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  profileCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  profileUserId: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: palette.text,
+  },
+  profileHint: {
+    fontSize: 12,
     color: palette.textMuted,
   },
-  billingValue: {
+  tierPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tierPillPro: {
+    borderColor: '#22c55e',
+    backgroundColor: '#dcfce7',
+  },
+  tierPillFree: {
+    borderColor: '#cbd5e1',
+    backgroundColor: '#e2e8f0',
+  },
+  tierPillText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  tierPillTextPro: { color: '#166534' },
+  tierPillTextFree: { color: '#334155' },
+
+  // Field blocks (email, avatar)
+  fieldBlock: {
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: 12,
+  },
+  fieldLabel: {
     fontSize: 13,
     fontWeight: '700',
     color: palette.text,
   },
-  billingValueScheduled: {
-    color: '#b45309',
+  fieldHint: {
+    fontSize: 12,
+    color: palette.textMuted,
+    lineHeight: 17,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    color: palette.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  fieldButton: {
+    alignSelf: 'flex-start',
   },
 
-  // Billing actions
-  billingActions: {
+  // Avatar preset grid
+  presetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 4,
+    gap: 8,
+  },
+  presetOption: {
+    width: 58,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  presetOptionSelected: {
+    borderColor: palette.primary,
+    backgroundColor: '#ecfeff',
+  },
+  presetBubble: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetGlyph: {
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  presetName: {
+    fontSize: 10,
+    color: '#334155',
+    fontWeight: '700',
   },
 
-  // Success / error inline feedback
+  // Info / success / error feedback
+  infoBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#dbe2f1',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  infoTextBold: {
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  codeInput: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 10,
+    textAlign: 'center',
+  },
+  emailChangeActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  resendHint: {
+    fontSize: 11,
+    color: palette.textMuted,
+    fontStyle: 'italic',
+  },
   successBox: {
     backgroundColor: '#f0fdf4',
     borderRadius: 8,
@@ -445,16 +843,69 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Microcopy
-  microcopy: {
+  // Subscription section
+  proBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#1e3a8a',
+  },
+  proBadgeText: {
     fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#dbeafe',
+  },
+  planTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: palette.text,
+  },
+  planText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textMuted,
+  },
+  priceLine: {
+    fontSize: 13,
     color: palette.textMuted,
     fontStyle: 'italic',
-    textAlign: 'center',
-    opacity: 0.8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(29, 78, 216, 0.18)',
+    marginVertical: 2,
+  },
+  billingTable: {
+    gap: 8,
+  },
+  billingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  billingLabel: {
+    fontSize: 13,
+    color: palette.textMuted,
+  },
+  billingValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  billingValueScheduled: {
+    color: '#b45309',
+  },
+  billingActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
   },
 
-  // Modal
+  // Cancel confirmation modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.52)',

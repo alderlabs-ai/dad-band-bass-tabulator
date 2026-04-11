@@ -13,7 +13,11 @@ import { authScreenStyles as styles } from './authScreenStyles';
 
 const handlePattern = /^[a-z0-9_-]{3,30}$/;
 
-export function RegisterScreen() {
+interface RegisterScreenProps {
+  onRegistered: (maskedEmail: string) => void;
+}
+
+export function RegisterScreen({ onRegistered }: RegisterScreenProps) {
   const { width } = useWindowDimensions();
   const isNarrow = width < 390;
   const {
@@ -73,12 +77,16 @@ export function RegisterScreen() {
       return;
     }
 
-    await register({
+    const result = await register({
       rawEmail: email,
       rawPassword: password,
       rawHandle: handle,
       rawAvatarUrl: avatarUrl,
     });
+
+    if (result?.email) {
+      onRegistered(result.maskedEmail);
+    }
   };
 
   return (

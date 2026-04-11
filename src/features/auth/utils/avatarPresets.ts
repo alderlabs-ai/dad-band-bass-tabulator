@@ -27,6 +27,17 @@ export const avatarPresets: AvatarPreset[] = [
   { id: 'rocket', label: 'Rocket', glyph: '🚀', background: '#2dd4bf', textColor: '#042f2e' },
   { id: 'coffee', label: 'Coffee', glyph: '☕', background: '#c084fc', textColor: '#2e1065' },
   { id: 'stage', label: 'Stage', glyph: '🎤', background: '#f472b6', textColor: '#500724' },
+  { id: 'note', label: 'Note', glyph: '🎵', background: '#6366f1', textColor: '#e0e7ff' },
+  { id: 'groove', label: 'Groove', glyph: '🎶', background: '#0ea5e9', textColor: '#082f49' },
+  { id: 'studio', label: 'Studio', glyph: '🎙️', background: '#1e293b', textColor: '#e2e8f0' },
+  { id: 'sax', label: 'Sax', glyph: '🎷', background: '#d97706', textColor: '#451a03' },
+  { id: 'brass', label: 'Brass', glyph: '🎺', background: '#fbbf24', textColor: '#451a03' },
+  { id: 'fiddle', label: 'Fiddle', glyph: '🎻', background: '#92400e', textColor: '#fef3c7' },
+  { id: 'banjo', label: 'Banjo', glyph: '🪕', background: '#a16207', textColor: '#fefce8' },
+  { id: 'congo', label: 'Congo', glyph: '🪘', background: '#b45309', textColor: '#fffbeb' },
+  { id: 'squeeze', label: 'Squeeze', glyph: '🪗', background: '#dc2626', textColor: '#fff1f2' },
+  { id: 'fader', label: 'Fader', glyph: '🎚️', background: '#475569', textColor: '#f1f5f9' },
+  { id: 'flute', label: 'Flute', glyph: '🪈', background: '#16a34a', textColor: '#f0fdf4' },
 ];
 
 export const avatarPresetValue = (presetId: string): string => `preset:${presetId}`;
