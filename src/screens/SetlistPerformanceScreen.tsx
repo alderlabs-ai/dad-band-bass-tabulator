@@ -278,7 +278,6 @@ export function SetlistPerformanceScreen({ route }: Props) {
               isPhone ? styles.pageMetaPhone : { width: Math.min(canvasWidth, availableCanvasWidth) },
             ]}
           >
-            <Text style={styles.pageHeading}>Setlist Performance</Text>
             <Text style={styles.pageSubheading}>
               Song {safeSongIndex + 1}/{totalSongs} • Page {safePageIndex + 1}/{pages.length}
             </Text>
@@ -445,13 +444,6 @@ const styles = StyleSheet.create({
   },
   pageMetaPhone: {
     width: '100%',
-  },
-  pageHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: palette.liveAccent,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   pageSubheading: {
     fontSize: 13,

@@ -100,14 +100,6 @@ export function LiveViewScreen({ route }: Props) {
               isPhone ? styles.pageMetaPhone : { width: Math.min(canvasWidth, availableCanvasWidth) },
             ]}
           >
-            <Text style={styles.pageHeading}>Performance Chart</Text>
-            <Text style={styles.pageSubheading}>
-              {isPhone
-                ? 'Scroll sideways for the full chart'
-                : isTablet
-                  ? 'Tablet stage view with a wider reading layout'
-                  : 'Full song, A4 reading layout'}
-            </Text>
             <View style={styles.renderModeControl}>
               <Text style={styles.renderModeLabel}>Render mode</Text>
               <View style={styles.renderModeSelector}>
@@ -217,17 +209,6 @@ const styles = StyleSheet.create({
   },
   pageMetaPhone: {
     width: '100%',
-  },
-  pageHeading: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: palette.liveAccent,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  pageSubheading: {
-    fontSize: 14,
-    color: palette.liveMuted,
   },
   renderModeControl: {
     gap: 4,
