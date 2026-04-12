@@ -69,6 +69,7 @@ const serializeSongDraft = (song: Song): string =>
   JSON.stringify({
     title: song.title,
     artist: song.artist,
+    authorComment: song.authorComment ?? null,
     key: song.key,
     tuning: song.tuning,
     stringNames: song.stringNames,
@@ -76,6 +77,7 @@ const serializeSongDraft = (song: Song): string =>
   });
 
 const STRING_COUNT_OPTIONS = [4, 5];
+const AUTHOR_COMMENT_MAX = 200;
 
 export function SongEditorScreen({ navigation, route }: Props) {
   const { songId, isNew = false } = route.params;
@@ -318,6 +320,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
     updateSong(editorSong.id, {
       title: editorSong.title,
       artist: editorSong.artist,
+      authorComment: editorSong.authorComment ?? '',
       key: editorSong.key,
       tuning: editorSong.tuning,
       stringNames: editorSong.stringNames,
@@ -508,6 +511,26 @@ export function SongEditorScreen({ navigation, route }: Props) {
             </View>
           </View>
         </ScrollView>
+      </View>
+
+      <View style={styles.authorNoteCard}>
+        <View style={styles.authorNoteHeader}>
+          <Text style={styles.compactFieldLabel}>Author note</Text>
+          <Text style={styles.authorNoteCounter}>
+            {(editorSong.authorComment ?? '').length}/{AUTHOR_COMMENT_MAX}
+          </Text>
+        </View>
+        <TextInput
+          value={editorSong.authorComment ?? ''}
+          onChangeText={(value) => handleFieldChange('authorComment', value.slice(0, AUTHOR_COMMENT_MAX))}
+          style={styles.authorNoteInput}
+          multiline
+          textAlignVertical="top"
+          placeholder="Add context for this chart (feel, arrangement, cues, etc.)"
+          placeholderTextColor={palette.textMuted}
+          editable
+          maxLength={AUTHOR_COMMENT_MAX}
+        />
       </View>
 
       <ScrollView
@@ -781,6 +804,35 @@ const styles = StyleSheet.create({
   },
   defaultBeatPillTextActive: {
     color: palette.primary,
+  },
+  authorNoteCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    gap: 6,
+  },
+  authorNoteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  authorNoteCounter: {
+    fontSize: 11,
+    color: palette.textMuted,
+    fontWeight: '600',
+  },
+  authorNoteInput: {
+    minHeight: 78,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: palette.text,
   },
   editorScroll: {
     flex: 1,

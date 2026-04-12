@@ -662,7 +662,7 @@ export function SectionEditorCard({
                             size="compact"
                           />
                           <PrimaryButton
-                            label="Copy Block"
+                            label="Copy Row"
                             onPress={duplicateRow}
                             variant="ghost"
                             style={[styles.sidebarButton, isCompactLayout && styles.sidebarButtonCompact]}
@@ -1330,7 +1330,7 @@ function RowEditor({
           ]}
         />
         <PrimaryButton
-          label={useMobileCellEditor ? 'Paste' : '⎘ Paste'}
+          label={useMobileCellEditor ? 'Paste Over' : '⎘ Paste Over'}
           onPress={() => {
             if (!copiedBar) {
               return;

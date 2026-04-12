@@ -14,6 +14,7 @@ export type SongListItemProps = {
   contributorName?: string;
   contributorAvatarUrl?: string | null;
   contributionDate?: string;
+  authorComment?: string | null;
   subtext?: string;
   voteScore: number;
   userVote: 'UP' | 'DOWN' | null;
@@ -41,6 +42,7 @@ export function SongListItem({
   contributorName,
   contributorAvatarUrl,
   contributionDate,
+  authorComment,
   subtext,
   voteScore,
   userVote,
@@ -141,6 +143,11 @@ export function SongListItem({
               {contributionDate ? ` • ${contributionDate}` : ''}
             </Text>
           </View>
+        ) : null}
+        {authorComment?.trim() ? (
+          <Text style={styles.authorComment} numberOfLines={3}>
+            {authorComment.trim()}
+          </Text>
         ) : null}
         {subtext ? (
           <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text>
@@ -323,6 +330,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9ca3af',
     flex: 1,
+  },
+  authorComment: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#334155',
+    marginTop: 4,
   },
   subtext: {
     fontSize: 11,

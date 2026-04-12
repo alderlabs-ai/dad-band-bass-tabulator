@@ -75,6 +75,11 @@ export function LibrarySongCard({
             </View>
           ) : null}
         </View>
+        {song.authorComment?.trim() ? (
+          <Text style={styles.authorComment} numberOfLines={3}>
+            {song.authorComment.trim()}
+          </Text>
+        ) : null}
         {subtext ? (
           <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text>
         ) : null}
@@ -190,6 +195,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     opacity: 0.8,
     marginTop: -6,
+  },
+  authorComment: {
+    marginTop: -4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.textMuted,
   },
   footer: {
     gap: 12,

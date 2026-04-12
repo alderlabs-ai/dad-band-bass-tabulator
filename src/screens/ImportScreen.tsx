@@ -48,6 +48,7 @@ type CommunitySongListItem = CommunitySongCard;
 interface CommunityPreviewData {
   title: string;
   artist: string;
+  authorComment?: string | null;
   key: string;
   tuning: string;
   author?: CommunitySongAuthor;
@@ -113,6 +114,7 @@ function toCommunitySongListItem(song: CommunitySongCardDto): CommunitySongListI
     sourceSongId: song.sourceSongId ?? song.id ?? null,
     title: song.title,
     artist: song.artist,
+    authorComment: song.authorComment ?? null,
     key: song.key ?? 'E',
     tuning: song.tuning ?? 'EADG',
     author: song.author
@@ -359,6 +361,7 @@ export function ImportScreen({ navigation }: Props) {
       setPreviewData({
         title: communitySong.title,
         artist: communitySong.artist,
+        authorComment: communitySong.authorComment ?? null,
         key: communitySong.key ?? 'E',
         tuning: communitySong.tuning ?? 'EADG',
         author: communitySong.author
@@ -754,6 +757,7 @@ export function ImportScreen({ navigation }: Props) {
               contributorName={isOrphaned ? undefined : (isOwner ? (currentUserDisplayName ?? song.author?.displayName ?? 'You') : (song.author?.displayName ?? 'Community'))}
               contributorAvatarUrl={isOrphaned ? null : (song.author?.avatarUrl ?? null)}
               contributionDate={isOrphaned ? undefined : dateLabel}
+              authorComment={song.authorComment ?? null}
               voteScore={song.votes.upVotes - song.votes.downVotes}
               userVote={song.votes.currentUserVote}
               onPreview={() => {
@@ -829,6 +833,9 @@ export function ImportScreen({ navigation }: Props) {
               <Text style={styles.previewMeta}>
                 {previewData.artist} • {previewData.key} • {previewData.tuning}
               </Text>
+              {previewData.authorComment?.trim() ? (
+                <Text style={styles.previewComment}>{previewData.authorComment.trim()}</Text>
+              ) : null}
               <AuthorChip author={previewData.author} fallbackName={previewData.artist} />
             </View>
 
@@ -1071,6 +1078,12 @@ const styles = StyleSheet.create({
   previewMeta: {
     fontSize: 13,
     color: palette.textMuted,
+  },
+  previewComment: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.text,
   },
   previewScroll: {
     maxHeight: 420,

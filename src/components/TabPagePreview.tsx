@@ -417,6 +417,10 @@ function SvgTabPagePreview({
   const resolvedRowBarCounts = resolveRowBarCounts(bars, rowBarCounts, barsPerRow);
   let barCursor = 0;
   const svgScale = SVG_SCALE_PROFILES[svgScaleProfile];
+  const resolvedNotationTopInset = Math.max(
+    svgScale.notationTopInset,
+    SVG_SHORT_BEAT_STEM_Y_OFFSET + svgScale.stemHeight + 2 - svgScale.rowPadding,
+  );
 
   const baseSlotAdvance = svgScale.slotWidth + svgScale.slotGap;
   const fallbackViewportWidth = Math.max(320, windowWidth - 40);
@@ -465,7 +469,7 @@ function SvgTabPagePreview({
         const stringPositions =
           stringNames.length > 0
             ? stringNames.map(
-              (_, index) => svgScale.rowPadding + svgScale.notationTopInset + index * svgScale.stringSpacing,
+              (_, index) => svgScale.rowPadding + resolvedNotationTopInset + index * svgScale.stringSpacing,
             )
             : [svgScale.rowPadding];
         const svgHeight = Math.max(
@@ -519,7 +523,7 @@ function SvgTabPagePreview({
                     height: svgHeight + 4,
                     width: svgScale.labelColumnWidth,
                     marginRight: svgScale.rowGap,
-                    paddingTop: svgScale.notationTopInset,
+                    paddingTop: resolvedNotationTopInset,
                   },
                 ]}
               >

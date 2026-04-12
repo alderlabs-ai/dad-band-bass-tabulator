@@ -5,6 +5,7 @@ export interface SongMetadataDto {
   id: string;
   title: string;
   artist: string;
+  authorComment?: string | null;
   key: string;
   tuning: string;
   updatedAt: string;
@@ -31,6 +32,7 @@ export interface PlaylistDto {
 export interface CreateSongRequestDto {
   title: string;
   artist: string;
+  authorComment?: string;
   key: string;
   tuning: string;
   chart: SongChartDto;
@@ -40,6 +42,7 @@ export interface CreateSongRequestDto {
 export interface UpdateSongMetadataRequestDto {
   title?: string;
   artist?: string;
+  authorComment?: string;
   key?: string;
   tuning?: string;
   stringCount?: number;
@@ -170,6 +173,7 @@ export interface CommunitySongCardDto {
   sourceSongId?: string | null;
   title: string;
   artist: string;
+  authorComment?: string | null;
   key?: string | null;
   tuning?: string | null;
   author?: CommunitySongAuthorDto;
@@ -247,6 +251,7 @@ const isSongMetadataDto = (value: unknown): value is SongMetadataDto => {
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     typeof value.artist === 'string' &&
+    (typeof value.authorComment === 'undefined' || isNullableString(value.authorComment)) &&
     typeof value.key === 'string' &&
     typeof value.tuning === 'string' &&
     typeof value.updatedAt === 'string' &&
@@ -575,6 +580,7 @@ const toCommunitySongCardDto = (value: unknown): CommunitySongCardDto => {
     !rawId ||
     typeof value.title !== 'string' ||
     typeof value.artist !== 'string' ||
+    (typeof value.authorComment !== 'undefined' && !isNullableString(value.authorComment)) ||
     !isNullableSongMeta(value.key) ||
     !isNullableSongMeta(value.tuning) ||
     !isNullableCommunitySongAuthorDto(value.author) ||
@@ -620,6 +626,7 @@ const toCommunitySongCardDto = (value: unknown): CommunitySongCardDto => {
     sourceSongId,
     title: value.title,
     artist: value.artist,
+    authorComment: isNullableString(value.authorComment) ? value.authorComment : null,
     key: isNullableSongMeta(value.key) ? value.key : null,
     tuning: isNullableSongMeta(value.tuning) ? value.tuning : null,
     author,
@@ -707,6 +714,7 @@ const normalizeSongMetadataDto = (value: unknown): SongMetadataDto | null => {
     id: value.id,
     title: typeof value.title === 'string' ? value.title : '',
     artist: typeof value.artist === 'string' ? value.artist : '',
+    authorComment: isNullableString(value.authorComment) ? value.authorComment : null,
     key: typeof value.key === 'string' ? value.key : 'E',
     tuning: typeof value.tuning === 'string' ? value.tuning : 'EADG',
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
@@ -808,6 +816,7 @@ export const parseSongDto = (value: unknown): SongDto => {
     id: value.id,
     title: typeof value.title === 'string' ? value.title : '',
     artist: typeof value.artist === 'string' ? value.artist : '',
+    authorComment: isNullableString(value.authorComment) ? value.authorComment : null,
     key: typeof value.key === 'string' ? value.key : 'E',
     tuning: typeof value.tuning === 'string' ? value.tuning : 'EADG',
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),

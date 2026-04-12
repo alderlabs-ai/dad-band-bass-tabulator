@@ -34,6 +34,7 @@ import { DEFAULT_BEAT_COUNT, getSlotsPerBar, parseTab } from '../utils/tabLayout
 interface SongInput {
   title?: string;
   artist?: string;
+  authorComment?: string;
   key?: string;
   tuning?: string;
   stringCount?: number;
@@ -57,6 +58,7 @@ interface LegacySong {
   id: string;
   title: string;
   artist: string;
+  authorComment?: string | null;
   key: string;
   tuning: string;
   updatedAt: string;
@@ -207,6 +209,7 @@ const toSongFromMetadata = (metadata: SongMetadataDto): Song => {
     id: metadata.id,
     title: metadata.title,
     artist: metadata.artist,
+    authorComment: metadata.authorComment ?? null,
     key: metadata.key,
     tuning: metadata.tuning,
     updatedAt: metadata.updatedAt,
@@ -245,6 +248,7 @@ const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
     return {
       ...currentSong,
       stringCount: inferredStringCount,
+      authorComment: currentSong.authorComment ?? null,
     };
   }
 
@@ -257,6 +261,7 @@ const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
       id: legacySong.id,
       title: legacySong.title,
       artist: legacySong.artist,
+      authorComment: legacySong.authorComment ?? null,
       key: legacySong.key,
       tuning: legacySong.tuning,
       updatedAt: legacySong.updatedAt,
@@ -294,6 +299,7 @@ const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
     id: legacySong.id,
     title: legacySong.title,
     artist: legacySong.artist,
+    authorComment: legacySong.authorComment ?? null,
     key: legacySong.key,
     tuning: legacySong.tuning,
     updatedAt: legacySong.updatedAt,
@@ -606,6 +612,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       id: createId('song'),
       title: input?.title ?? 'Untitled Song',
       artist: input?.artist ?? 'Unknown Artist',
+      authorComment: input?.authorComment ?? null,
       key: input?.key ?? 'E',
       tuning: input?.tuning ?? tuningOptions[0],
       updatedAt: new Date().toISOString(),
@@ -623,6 +630,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       await backendApi.createSong({
         title: draftSong.title,
         artist: draftSong.artist,
+        ...(draftSong.authorComment ? { authorComment: draftSong.authorComment } : {}),
         key: draftSong.key,
         tuning: draftSong.tuning,
         stringCount: draftSong.stringCount,
@@ -791,6 +799,9 @@ export function BassTabProvider({ children }: PropsWithChildren) {
     const metadataPayload = {
       ...(updates.title !== undefined ? { title: updates.title } : {}),
       ...(updates.artist !== undefined ? { artist: updates.artist } : {}),
+      ...(updates.authorComment !== undefined
+        ? { authorComment: updates.authorComment ?? '' }
+        : {}),
       ...(updates.key !== undefined ? { key: updates.key } : {}),
       ...(updates.tuning !== undefined ? { tuning: updates.tuning } : {}),
       ...(normalizedUpdates.stringCount !== undefined ? { stringCount: normalizedUpdates.stringCount } : {}),
@@ -959,6 +970,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           await backendApi.updateSongMetadata(song.id, {
             title: song.title,
             artist: song.artist,
+            ...(song.authorComment ? { authorComment: song.authorComment } : {}),
             key: song.key,
             tuning: song.tuning,
           });
@@ -975,6 +987,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           await backendApi.createSong({
             title: song.title,
             artist: song.artist,
+            ...(song.authorComment ? { authorComment: song.authorComment } : {}),
             key: song.key,
             tuning: song.tuning,
             stringCount: song.stringCount,

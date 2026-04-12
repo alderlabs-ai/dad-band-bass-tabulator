@@ -52,6 +52,7 @@ export type CommunitySongCard = {
   sourceSongId?: string | null;
   title: string;
   artist: string;
+  authorComment?: string | null;
   key?: string | null;
   tuning?: string | null;
   author?: CommunitySongAuthor;
@@ -73,6 +74,7 @@ export interface Song {
   id: string;
   title: string;
   artist: string;
+  authorComment?: string | null;
   key: string;
   tuning: string;
   updatedAt: string;

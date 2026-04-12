@@ -101,7 +101,7 @@ export function LibraryScreen({ navigation }: Props) {
     }
 
     return songs.filter((song) =>
-      [song.title, song.artist, song.key, song.tuning]
+      [song.title, song.artist, song.authorComment ?? '', song.key, song.tuning]
         .join(' ')
         .toLowerCase()
         .includes(normalized),
@@ -290,7 +290,7 @@ export function LibraryScreen({ navigation }: Props) {
             <LibrarySongCard
               key={song.id}
               song={song}
-              subtext={getSongQuip(song.id)}
+              subtext={song.authorComment?.trim() ? undefined : getSongQuip(song.id)}
               onEdit={() => navigation.navigate('SongEditor', { songId: song.id })}
               onLive={() => navigation.navigate('PerformanceView', { songId: song.id })}
               onDelete={() => handleDeleteSong(song.id, song.title)}
