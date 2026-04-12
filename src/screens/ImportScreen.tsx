@@ -66,8 +66,9 @@ function resolveCommunityDetailId(song: CommunitySongCard) {
   return song.publishedSongId ?? song.id;
 }
 
-function resolveCommunityVoteId(song: CommunitySongCard) {
-  return song.sourceSongId ?? song.id;
+function resolveCommunityVoteIds(song: CommunitySongCard): string[] {
+  const candidates = [song.id, song.publishedSongId ?? null, song.sourceSongId ?? null];
+  return Array.from(new Set(candidates.filter((value): value is string => typeof value === 'string' && value.length > 0)));
 }
 
 function formatPublishedDateLabel(isoDate: string | null | undefined): string {
@@ -260,6 +261,7 @@ export function ImportScreen({ navigation }: Props) {
   const [adoptingSongId, setAdoptingSongId] = useState<string | null>(null);
   const [previewLoadingSongId, setPreviewLoadingSongId] = useState<string | null>(null);
   const [votingSongId, setVotingSongId] = useState<string | null>(null);
+  const [voteBlockedSongTitle, setVoteBlockedSongTitle] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CommunityPreviewData | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [statusMessage, setStatusMessage] = useState('Browse community charts and save the ones you want to play.');
@@ -548,16 +550,41 @@ export function ImportScreen({ navigation }: Props) {
       return;
     }
 
-    const voteSongId = resolveCommunityVoteId(selectedSong);
+    if (currentUserId && selectedSong.author?.userId === currentUserId) {
+      setVoteBlockedSongTitle(selectedSong.title);
+      return;
+    }
+
     setVotingSongId(selectedSong.id);
 
     try {
-      const nextVotes =
-        selectedSong.votes.currentUserVote === direction
-          ? await backendApi.clearCommunitySongVote(voteSongId)
-          : direction === 'UP'
-            ? await backendApi.voteCommunitySongUp(voteSongId)
-            : await backendApi.voteCommunitySongDown(voteSongId);
+      let nextVotes: Awaited<ReturnType<typeof backendApi.voteCommunitySongUp>> | null = null;
+      let lastVoteError: unknown = null;
+      const voteSongIds = resolveCommunityVoteIds(selectedSong);
+
+      for (const voteSongId of voteSongIds) {
+        try {
+          nextVotes =
+            selectedSong.votes.currentUserVote === direction
+              ? await backendApi.clearCommunitySongVote(voteSongId)
+              : direction === 'UP'
+                ? await backendApi.voteCommunitySongUp(voteSongId)
+                : await backendApi.voteCommunitySongDown(voteSongId);
+          break;
+        } catch (voteError) {
+          lastVoteError = voteError;
+
+          if (voteError instanceof BassTabApiError && (voteError.status === 400 || voteError.status === 404)) {
+            continue;
+          }
+
+          throw voteError;
+        }
+      }
+
+      if (!nextVotes) {
+        throw (lastVoteError ?? new Error('Could not update vote.'));
+      }
 
       setCommunityCatalog((currentSongs) =>
         currentSongs.map((song) =>
@@ -573,7 +600,29 @@ export function ImportScreen({ navigation }: Props) {
             : song,
         ),
       );
+
+      try {
+        const refreshedSongs = sortCommunitySongs(
+          (await backendApi.listCommunitySongs()).map(toCommunitySongListItem),
+        );
+        setCommunityCatalog(refreshedSongs);
+      } catch (refreshError) {
+        console.warn('Community refresh after vote failed', refreshError);
+      }
     } catch (error) {
+      if (error instanceof BassTabApiError && (error.status === 400 || error.status === 404)) {
+        const lowerMessage = error.message.toLowerCase();
+        const noLongerAvailable =
+          lowerMessage.includes('not available in community') ||
+          lowerMessage.includes('not found');
+
+        if (noLongerAvailable) {
+          setStatusMessage('That song is no longer available in Community. Refreshing list.');
+          void hydrateCommunity();
+          return;
+        }
+      }
+
       const message = error instanceof Error ? error.message : 'Could not update vote.';
       setStatusMessage(message);
     } finally {
@@ -769,6 +818,7 @@ export function ImportScreen({ navigation }: Props) {
               onDownVote={() => {
                 void handleVote(song.id, 'DOWN');
               }}
+              voteDisabled={votingSongId === song.id}
               subtext={getSongQuip(song.id)}
               actionLabel={
                 isOwner
@@ -817,6 +867,30 @@ export function ImportScreen({ navigation }: Props) {
           );
         })
       )}
+
+      <Modal
+        visible={Boolean(voteBlockedSongTitle)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVoteBlockedSongTitle(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.voteModalCard}>
+            <Text style={styles.voteModalTitle}>Voting unavailable</Text>
+            <Text style={styles.voteModalText}>
+              {voteBlockedSongTitle
+                ? `You can't vote on your own song: "${voteBlockedSongTitle}".`
+                : 'You cannot vote on your own song.'}
+            </Text>
+            <View style={styles.voteModalActions}>
+              <PrimaryButton
+                label="OK"
+                onPress={() => setVoteBlockedSongTitle(null)}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={Boolean(previewData)}
@@ -1101,5 +1175,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  voteModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    padding: 18,
+    gap: 12,
+  },
+  voteModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: palette.text,
+  },
+  voteModalText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textMuted,
+  },
+  voteModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
 });

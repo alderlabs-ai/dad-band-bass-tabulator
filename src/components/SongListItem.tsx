@@ -21,6 +21,7 @@ export type SongListItemProps = {
   onPreview?: () => void;
   onUpVote?: () => void;
   onDownVote?: () => void;
+  voteDisabled?: boolean;
   onAction?: () => void;
   actionLabel?: string;
   actionDisabled?: boolean;
@@ -49,6 +50,7 @@ export function SongListItem({
   onPreview,
   onUpVote,
   onDownVote,
+  voteDisabled = false,
   onAction,
   actionLabel,
   actionDisabled,
@@ -78,13 +80,34 @@ export function SongListItem({
       ]}
     >
       <View style={styles.voteColumn}>
-        <Pressable onPress={onUpVote} style={highlightUp ? styles.voteHighlight : undefined}>
+        <Pressable
+          onPress={(event) => handleActionPress(event, onUpVote)}
+          disabled={voteDisabled || !onUpVote}
+          accessibilityRole="button"
+          accessibilityLabel="Upvote song"
+          hitSlop={8}
+          style={[
+            styles.voteButton,
+            highlightUp ? styles.voteButtonActive : styles.voteButtonIdle,
+            (voteDisabled || !onUpVote) && styles.voteButtonDisabled,
+          ]}
+        >
           <Text style={[styles.voteArrow, highlightUp && styles.voteArrowActive]}>▲</Text>
         </Pressable>
-        <Text style={styles.voteScore}>{voteScore}</Text>
+        <View style={styles.voteScorePill}>
+          <Text style={styles.voteScore}>{voteScore}</Text>
+        </View>
         <Pressable
-          onPress={onDownVote}
-          style={highlightDown ? styles.voteHighlight : undefined}
+          onPress={(event) => handleActionPress(event, onDownVote)}
+          disabled={voteDisabled || !onDownVote}
+          accessibilityRole="button"
+          accessibilityLabel="Downvote song"
+          hitSlop={8}
+          style={[
+            styles.voteButton,
+            highlightDown ? styles.voteButtonActive : styles.voteButtonIdle,
+            (voteDisabled || !onDownVote) && styles.voteButtonDisabled,
+          ]}
         >
           <Text style={[styles.voteArrow, highlightDown && styles.voteArrowActive]}>▼</Text>
         </Pressable>
@@ -231,25 +254,50 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   voteColumn: {
-    width: 50,
+    width: 64,
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 2,
+  },
+  voteButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  voteButtonIdle: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#cbd5e1',
+  },
+  voteButtonActive: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+  },
+  voteButtonDisabled: {
+    opacity: 0.55,
   },
   voteArrow: {
-    fontSize: 15,
-    color: palette.textMuted,
+    fontSize: 18,
+    color: '#64748b',
   },
   voteArrowActive: {
-    color: palette.accent,
+    color: '#b45309',
   },
-  voteHighlight: {
-    padding: 4,
-    borderRadius: 8,
-    backgroundColor: '#fefce8',
+  voteScorePill: {
+    minWidth: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
   voteScore: {
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 15,
     color: palette.text,
   },
   content: {

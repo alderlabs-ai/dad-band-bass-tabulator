@@ -13,6 +13,9 @@ export type PublishedSongInfo = {
   updatedAt: string;
   ownershipStatus?: OwnershipStatus | null;
   ownerUserId?: string | null;
+  upVotes: number;
+  downVotes: number;
+  ratingScore: number;
 };
 
 export function usePublishedSongLookup(backendApi?: BassTabApi | null) {
@@ -36,6 +39,9 @@ export function usePublishedSongLookup(backendApi?: BassTabApi | null) {
         const publishedSongId = entry.publishedSongId ?? entry.id ?? null;
 
         if (sourceSongId && publishedSongId) {
+          const upVotes = Math.max(0, entry.votes?.upVotes ?? 0);
+          const downVotes = Math.max(0, entry.votes?.downVotes ?? 0);
+
           acc[sourceSongId] = {
             publishedSongId,
             title: entry.title,
@@ -46,6 +52,9 @@ export function usePublishedSongLookup(backendApi?: BassTabApi | null) {
             updatedAt: entry.updatedAt,
             ownershipStatus: entry.ownershipStatus ?? null,
             ownerUserId: entry.author?.userId ?? null,
+            upVotes,
+            downVotes,
+            ratingScore: upVotes - downVotes,
           };
         }
 
