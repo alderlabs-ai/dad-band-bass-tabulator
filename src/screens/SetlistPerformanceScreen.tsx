@@ -9,72 +9,20 @@ import { palette } from '../constants/colors';
 import { useSubscription, useUpgradePrompt } from '../features/subscription';
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
-import { Song, SongChart } from '../types/models';
+import { Song } from '../types/models';
 import { flattenSongRowsToChart } from '../utils/songChart';
-import { ParsedBar, parseTab } from '../utils/tabLayout';
+import { parseTab } from '../utils/tabLayout';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SetlistPerformance'>;
 type PerformanceTone = 'light' | 'dark';
 
-interface PerformancePage {
-  bars: ParsedBar[];
-  rowAnnotations: SongChart['rowAnnotations'];
-  rowBarCounts: number[];
-}
-
 interface PerformanceItem {
   song: Song;
   stringNames: string[];
-  pages: PerformancePage[];
+  bars: ReturnType<typeof parseTab>['bars'];
+  rowAnnotations: ReturnType<typeof flattenSongRowsToChart>['rowAnnotations'];
+  rowBarCounts: ReturnType<typeof flattenSongRowsToChart>['rowBarCounts'];
 }
-
-const buildPages = (chart: SongChart, bars: ParsedBar[]): PerformancePage[] => {
-  const counts = (chart.rowBarCounts ?? []).filter((count) => count > 0);
-
-  if (counts.length === 0) {
-    return [
-      {
-        bars,
-        rowAnnotations: chart.rowAnnotations ?? [],
-        rowBarCounts: [Math.max(1, bars.length)],
-      },
-    ];
-  }
-
-  let cursor = 0;
-  const pages: PerformancePage[] = counts.map((count, rowIndex) => {
-    const nextCount = Math.max(1, count);
-    const nextBars = bars.slice(cursor, cursor + nextCount);
-    const annotation = chart.rowAnnotations[rowIndex];
-
-    cursor += nextCount;
-
-    return {
-      bars: nextBars,
-      rowAnnotations: annotation ? [annotation] : [],
-      rowBarCounts: [Math.max(1, nextBars.length || nextCount)],
-    };
-  });
-
-  if (cursor < bars.length) {
-    const remainderBars = bars.slice(cursor);
-    pages.push({
-      bars: remainderBars,
-      rowAnnotations: [],
-      rowBarCounts: [Math.max(1, remainderBars.length)],
-    });
-  }
-
-  return pages.length > 0
-    ? pages
-    : [
-      {
-        bars,
-        rowAnnotations: chart.rowAnnotations ?? [],
-        rowBarCounts: [Math.max(1, bars.length)],
-      },
-    ];
-};
 
 export function SetlistPerformanceScreen({ route }: Props) {
   const { setlistId, startSongId } = route.params ?? {};
@@ -86,7 +34,6 @@ export function SetlistPerformanceScreen({ route }: Props) {
   const [tone, setTone] = useState<PerformanceTone>('light');
   const hasAutoSelectedSvgModeRef = useRef(false);
   const [songIndex, setSongIndex] = useState(0);
-  const [pageIndex, setPageIndex] = useState(0);
   const appliedStartSongIdRef = useRef<string | null>(null);
 
   const selectedSetlist =
@@ -109,7 +56,9 @@ export function SetlistPerformanceScreen({ route }: Props) {
       return {
         song,
         stringNames: parsed.stringNames.length > 0 ? parsed.stringNames : song.stringNames,
-        pages: buildPages(chart, parsed.bars),
+        bars: parsed.bars,
+        rowAnnotations: chart.rowAnnotations ?? [],
+        rowBarCounts: chart.rowBarCounts,
       };
     });
   }, [orderedSongs]);
@@ -126,7 +75,6 @@ export function SetlistPerformanceScreen({ route }: Props) {
     const nextSongIndex = performanceItems.findIndex((item) => item.song.id === startSongId);
     if (nextSongIndex >= 0 && nextSongIndex !== songIndex) {
       setSongIndex(nextSongIndex);
-      setPageIndex(0);
     }
     appliedStartSongIdRef.current = startSongId;
   }, [performanceItems, songIndex, startSongId]);
@@ -136,17 +84,13 @@ export function SetlistPerformanceScreen({ route }: Props) {
       if (songIndex !== 0) {
         setSongIndex(0);
       }
-      if (pageIndex !== 0) {
-        setPageIndex(0);
-      }
       return;
     }
 
     if (songIndex > performanceItems.length - 1) {
       setSongIndex(performanceItems.length - 1);
-      setPageIndex(0);
     }
-  }, [pageIndex, performanceItems.length, songIndex]);
+  }, [performanceItems.length, songIndex]);
 
   const safeSongIndex =
     performanceItems.length === 0
@@ -154,22 +98,6 @@ export function SetlistPerformanceScreen({ route }: Props) {
       : Math.min(songIndex, performanceItems.length - 1);
   const currentItem = performanceItems[safeSongIndex];
   const totalSongs = performanceItems.length;
-  const pages = currentItem?.pages ?? [];
-  const safePageIndex = pages.length === 0 ? 0 : Math.min(pageIndex, pages.length - 1);
-  const currentPage = pages[safePageIndex];
-
-  useEffect(() => {
-    if (pages.length === 0) {
-      if (pageIndex !== 0) {
-        setPageIndex(0);
-      }
-      return;
-    }
-
-    if (pageIndex > pages.length - 1) {
-      setPageIndex(pages.length - 1);
-    }
-  }, [pageIndex, pages.length]);
 
   const isPhone = width < 760;
   const useCompactPreview = width < 960;
@@ -206,47 +134,12 @@ export function SetlistPerformanceScreen({ route }: Props) {
     setRenderMode('svg');
   }, [capabilities.svgEnabled]);
 
-  const handleNextPage = () => {
-    if (!currentItem) {
-      return;
-    }
-
-    if (safePageIndex < currentItem.pages.length - 1) {
-      setPageIndex(safePageIndex + 1);
-      return;
-    }
-
-    if (safeSongIndex < totalSongs - 1) {
-      setSongIndex(safeSongIndex + 1);
-      setPageIndex(0);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (!currentItem) {
-      return;
-    }
-
-    if (safePageIndex > 0) {
-      setPageIndex(safePageIndex - 1);
-      return;
-    }
-
-    if (safeSongIndex > 0) {
-      const previousSongIndex = safeSongIndex - 1;
-      const previousPageCount = performanceItems[previousSongIndex]?.pages.length ?? 1;
-      setSongIndex(previousSongIndex);
-      setPageIndex(Math.max(0, previousPageCount - 1));
-    }
-  };
-
   const handleNextSong = () => {
     if (safeSongIndex >= totalSongs - 1) {
       return;
     }
 
     setSongIndex(safeSongIndex + 1);
-    setPageIndex(0);
   };
 
   const handlePrevSong = () => {
@@ -255,10 +148,9 @@ export function SetlistPerformanceScreen({ route }: Props) {
     }
 
     setSongIndex(safeSongIndex - 1);
-    setPageIndex(0);
   };
 
-  if (!selectedSetlist || performanceItems.length === 0 || !currentItem || !currentPage) {
+  if (!selectedSetlist || performanceItems.length === 0 || !currentItem) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyState}>
@@ -345,7 +237,7 @@ export function SetlistPerformanceScreen({ route }: Props) {
             ]}
           >
             <Text style={styles.pageSubheading}>
-              Song {safeSongIndex + 1}/{totalSongs} • Page {safePageIndex + 1}/{pages.length}
+              Song {safeSongIndex + 1}/{totalSongs}
             </Text>
           </View>
 
@@ -364,9 +256,9 @@ export function SetlistPerformanceScreen({ route }: Props) {
             >
               <TabPagePreview
                 stringNames={currentItem.stringNames}
-                bars={currentPage.bars}
-                rowAnnotations={currentPage.rowAnnotations}
-                rowBarCounts={currentPage.rowBarCounts}
+                bars={currentItem.bars}
+                rowAnnotations={currentItem.rowAnnotations}
+                rowBarCounts={currentItem.rowBarCounts}
                 tone={tone}
                 compact={useCompactPreview}
                 renderMode={renderMode}
@@ -377,22 +269,6 @@ export function SetlistPerformanceScreen({ route }: Props) {
           </ScrollView>
 
           <View style={[styles.controlsCard, isPhone && styles.controlsCardPhone]}>
-            <View style={styles.controlsRow}>
-              <PrimaryButton
-                label="Prev Page"
-                onPress={handlePrevPage}
-                variant="ghost"
-                size="compact"
-                disabled={safeSongIndex === 0 && safePageIndex === 0}
-              />
-              <PrimaryButton
-                label="Next Page"
-                onPress={handleNextPage}
-                variant="secondary"
-                size="compact"
-                disabled={safeSongIndex === totalSongs - 1 && safePageIndex === pages.length - 1}
-              />
-            </View>
             <View style={styles.controlsRow}>
               <PrimaryButton
                 label="Prev Song"
