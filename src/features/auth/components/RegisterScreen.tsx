@@ -411,7 +411,9 @@ export function RegisterScreen({ onRegistered }: RegisterScreenProps) {
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <View style={localStyles.ctaBlock}>
-          <Text style={localStyles.nextStep}>Next: you'll land straight in your library.</Text>
+          <Text style={localStyles.nextStep}>
+            Next: check your email, enter the 6-digit code, then you&apos;ll land in your library.
+          </Text>
           <PrimaryButton
             label={isSubmitting ? 'Creating account...' : 'Start Playing'}
             onPress={() => {
