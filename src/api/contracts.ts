@@ -199,7 +199,7 @@ export interface SaveCommunitySongRequestDto {
   communitySongId: string;
 }
 
-export type DeleteSongWithPolicyIntentDto = 'removeFromCommunity' | 'orphanIfLiked';
+export type DeleteSongWithPolicyIntentDto = 'removeFromCommunity' | 'orphanAlways';
 
 export interface DeleteSongWithPolicyRequestDto {
   intent: DeleteSongWithPolicyIntentDto;

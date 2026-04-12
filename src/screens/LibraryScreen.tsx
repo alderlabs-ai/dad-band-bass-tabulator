@@ -5,7 +5,7 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { BassTabApiError, createBassTabApiFromEnv } from '../api';
+import { createBassTabApiFromEnv } from '../api';
 import { EmptyState } from '../components/EmptyState';
 import { AppSectionNav } from '../components/AppSectionNav';
 import { LibrarySongCard } from '../components/LibrarySongCard';
@@ -305,21 +305,23 @@ export function LibraryScreen({ navigation }: Props) {
     };
     setSongPendingDelete(null);
 
-    const isOrphanDelete =
-      tier === 'PRO' &&
-      Boolean(backendApi) &&
-      Boolean(pendingDelete.publishedSongId) &&
-      pendingDelete.communityAction === 'ORPHAN_THEN_DELETE';
     const isPolicyDelete =
       tier === 'PRO' &&
       Boolean(backendApi) &&
       Boolean(pendingDelete.publishedSongId) &&
-      pendingDelete.communityAction === 'REMOVE_FROM_COMMUNITY_THEN_DELETE';
+      pendingDelete.communityAction !== 'LOCAL_ONLY';
 
-    if (isOrphanDelete && backendApi && pendingDelete.publishedSongId) {
+    if (isPolicyDelete && backendApi) {
+      const intent =
+        pendingDelete.communityAction === 'ORPHAN_THEN_DELETE'
+          ? 'orphanAlways'
+          : 'removeFromCommunity';
+
       try {
-        await backendApi.disownCommunitySong(pendingDelete.publishedSongId);
-        await backendApi.deleteSong(pendingDelete.backendSongId ?? pendingDelete.id);
+        await backendApi.deleteSongWithPolicy(
+          pendingDelete.backendSongId ?? pendingDelete.id,
+          intent,
+        );
       } catch (error) {
         const trigger = resolveUpgradeTrigger(error);
 
@@ -330,49 +332,16 @@ export function LibraryScreen({ navigation }: Props) {
 
         const message = error instanceof Error
           ? error.message
-          : 'Could not orphan in Community and delete from library.';
+          : 'Could not delete song with community policy.';
         setStatusMessage(message);
         return;
-      }
-    } else if (isPolicyDelete && backendApi) {
-      try {
-        await backendApi.deleteSongWithPolicy(
-          pendingDelete.backendSongId ?? pendingDelete.id,
-          pendingDelete.communityAction === 'ORPHAN_THEN_DELETE'
-            ? 'orphanIfLiked'
-            : 'removeFromCommunity',
-        );
-      } catch (error) {
-        const trigger = resolveUpgradeTrigger(error);
-
-        if (trigger) {
-          showUpgradePrompt(trigger);
-          return;
-        }
-
-        if (
-          error instanceof BassTabApiError &&
-          error.status === 404 &&
-          /community song not found/i.test(error.message)
-        ) {
-          console.warn('Community song already missing during delete flow', {
-            pendingDelete,
-            message: error.message,
-          });
-        } else {
-          const message = error instanceof Error
-            ? error.message
-            : 'Could not delete song with community policy.';
-          setStatusMessage(message);
-          return;
-        }
       }
     }
 
     deleteSong(
       pendingDelete.id,
       pendingDelete.backendSongId ?? pendingDelete.id,
-      { skipBackendDelete: isPolicyDelete || isOrphanDelete },
+      { skipBackendDelete: isPolicyDelete },
     );
     void refreshPublishedLookup().catch((error) => {
       console.warn('Failed to refresh published lookup after delete', error);
