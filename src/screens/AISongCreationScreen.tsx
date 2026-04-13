@@ -38,6 +38,47 @@ const LOADING_QUIPS = [
   'Blaming it on the amp settings…',
 ];
 
+// Update this list any time you want new random artist suggestions in AI Create.
+const SUGGESTED_BANDS = [
+  'Mouse Rat',
+  'The Butthole Surfers',
+  'Psychedelic Porn Crumpets',
+  'King Gizzard & the Lizard Wizard',
+  'Judge Dread',
+  'Toad the Wet Sprocket',
+  'Titwank',
+  'Dr. Teeth and the Electric Mayhem',
+  'Half Man Half Biscuit',
+  'The Knob Jockies',
+  'Wet Blanket',
+  'Love Fist',
+  'The Bell Ends'
+];
+
+// Update this list any time you want new random song title suggestions in AI Create.
+const SUGGESTED_TITLES = [
+  'I Left the Oven On Again',
+  "This Isn't the Right Key",
+  'Mum Says Turn It Down',
+  'Sorry About the Noise',
+  'The Bass Is Probably Fine',
+  'We Forgot the Ending',
+  "That Wasn't Me Playing",
+  "It Gets Better (It Doesn't)",
+  'One More Take (Definitely the Last)',
+  'I Thought This Was Practice',
+  'The Chorus Never Arrived',
+  'Please Clap at the End',
+  "We'll Fix It Later",
+  'This Bit Goes On Too Long',
+  'I Blame the Drummer',
+  'That Note Was Intentional',
+  'Nearly Had It That Time',
+  'The Amp Is Definitely On',
+  'We Start Again Here',
+  "Don't Tell Anyone About This",
+];
+
 const GHOST_STRING_NAMES = ['G', 'D', 'A', 'E'];
 
 // Three patterns of controlled chaos. Musical in spirit, questionable in practice.
@@ -123,17 +164,28 @@ export function AISongCreationScreen({ navigation }: Props) {
 
   const [artist, setArtist] = useState('');
   const [title, setTitle] = useState('');
+  const [influenceLine, setInfluenceLine] = useState('');
   const [generateState, setGenerateState] = useState<GenerateState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [lessTerribleMode, setLessTerribleMode] = useState(false);
   const [quipIndex, setQuipIndex] = useState(0);
+  const [suggestedBandIndex, setSuggestedBandIndex] = useState(
+    () => Math.floor(Math.random() * SUGGESTED_BANDS.length),
+  );
+  const [suggestedTitleIndex, setSuggestedTitleIndex] = useState(
+    () => Math.floor(Math.random() * SUGGESTED_TITLES.length),
+  );
   const [ghostPatternIndex, setGhostPatternIndex] = useState(() => Math.floor(Math.random() * GHOST_PATTERNS.length));
   const [ghostCommentIndex, setGhostCommentIndex] = useState(() => Math.floor(Math.random() * GHOST_COMMENTS.length));
   const quipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cursorOpacity = useRef(new Animated.Value(1)).current;
+  const suggestedBand = SUGGESTED_BANDS[suggestedBandIndex] ?? 'Nirvana';
+  const suggestedTitle = SUGGESTED_TITLES[suggestedTitleIndex] ?? 'Moody garage riff';
 
   useFocusEffect(
     useCallback(() => {
+      setSuggestedBandIndex(Math.floor(Math.random() * SUGGESTED_BANDS.length));
+      setSuggestedTitleIndex(Math.floor(Math.random() * SUGGESTED_TITLES.length));
       setGhostPatternIndex(Math.floor(Math.random() * GHOST_PATTERNS.length));
       setGhostCommentIndex(Math.floor(Math.random() * GHOST_COMMENTS.length));
 
@@ -170,6 +222,7 @@ export function AISongCreationScreen({ navigation }: Props) {
 
   const canGenerate =
     artist.trim().length > 0 && title.trim().length > 0 && generateState !== 'generating';
+  const isProTier = tier === 'PRO';
   const maxSongs = capabilities.maxSongs;
   const hasSongLimit = tier === 'FREE' && maxSongs !== null;
   const remainingSongSlots = hasSongLimit ? Math.max(maxSongs - songs.length, 0) : null;
@@ -197,9 +250,11 @@ export function AISongCreationScreen({ navigation }: Props) {
     setErrorMessage('');
 
     try {
+      const trimmedInfluenceLine = influenceLine.trim();
       const dto = await backendApi.aiGenerateSong({
         artist: artist.trim(),
         title: title.trim(),
+        ...(trimmedInfluenceLine.length > 0 ? { influenceLine: trimmedInfluenceLine } : {}),
       });
 
       const song = importSongFromDto(dto);
@@ -216,6 +271,13 @@ export function AISongCreationScreen({ navigation }: Props) {
       if (error instanceof BassTabApiError && error.code === 'AI_GENERATE_DAILY_LIMIT') {
         setErrorMessage('Daily generation limit reached. Try again tomorrow.');
         setGenerateState('error');
+        return;
+      }
+
+      if (error instanceof BassTabApiError && error.code === 'AI_GENERATE_LOCKED') {
+        setErrorMessage('Custom AI influence line requires Pro.');
+        setGenerateState('error');
+        showUpgradePrompt('AI_GENERATE');
         return;
       }
 
@@ -292,7 +354,7 @@ export function AISongCreationScreen({ navigation }: Props) {
             <TextInput
               value={artist}
               onChangeText={setArtist}
-              placeholder="Nirvana (but worse)"
+              placeholder={`${suggestedBand} (but worse)`}
               placeholderTextColor={palette.textMuted}
               style={styles.input}
               autoCapitalize="words"
@@ -305,12 +367,32 @@ export function AISongCreationScreen({ navigation }: Props) {
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Moody garage riff"
+              placeholder={suggestedTitle}
               placeholderTextColor={palette.textMuted}
               style={styles.input}
               autoCapitalize="words"
               editable={generateState !== 'generating'}
             />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Influence line (Pro)</Text>
+            <TextInput
+              value={influenceLine}
+              onChangeText={setInfluenceLine}
+              placeholder="Think Black Sabbath groove with Cure atmosphere..."
+              placeholderTextColor={palette.textMuted}
+              style={[styles.input, !isProTier && styles.inputLocked]}
+              editable={generateState !== 'generating' && isProTier}
+              maxLength={500}
+            />
+            {!isProTier ? (
+              <Pressable onPress={() => showUpgradePrompt('AI_GENERATE')}>
+                <Text style={styles.proLockHint}>Custom AI influence line requires Pro.</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.characterHint}>{influenceLine.length}/500</Text>
+            )}
           </View>
 
           {/* Toggle */}
@@ -501,6 +583,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: palette.text,
+  },
+  inputLocked: {
+    opacity: 0.65,
+  },
+  proLockHint: {
+    fontSize: 12,
+    color: palette.accent,
+    fontWeight: '700',
+  },
+  characterHint: {
+    fontSize: 11,
+    color: palette.textMuted,
+    textAlign: 'right',
   },
   toggleRow: {
     flexDirection: 'row',

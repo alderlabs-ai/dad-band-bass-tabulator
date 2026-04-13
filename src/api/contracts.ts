@@ -55,6 +55,7 @@ export interface ReplaceSongChartRequestDto {
 export interface AiGenerateSongRequestDto {
   artist: string;
   title: string;
+  influenceLine?: string;
 }
 
 export interface ReplacePlaylistOrderRequestDto {
