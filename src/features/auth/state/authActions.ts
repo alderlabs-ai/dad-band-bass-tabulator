@@ -4,6 +4,7 @@ import type { AuthStoreState, AuthView } from './authTypes.ts';
 import { toAuthErrorMessage } from '../utils/authErrorMessage.ts';
 import { isValidEmail, normalizeEmail } from '../utils/email.ts';
 import { logClientEvent } from '../../../utils/clientTelemetry';
+import { appLog } from '../../../utils/logging';
 
 interface ActionDeps {
   api: AuthApi | null;
@@ -361,7 +362,7 @@ export const createAuthActions = ({ api, dispatch, getState }: ActionDeps) => {
     // Fire-and-forget server-side session invalidation.
     if (api) {
       api.logout().catch((error) => {
-        console.warn('Auth logout server call failed', error);
+        appLog.warn('Auth logout server call failed', error);
       });
     }
   };

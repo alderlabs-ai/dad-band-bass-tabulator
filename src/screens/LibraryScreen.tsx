@@ -21,6 +21,7 @@ import { useBassTab } from '../store/BassTabProvider';
 import { Song } from '../types/models';
 import { usePublishedSongLookup, PublishedSongInfo } from '../hooks/usePublishedSongLookup';
 import { logClientEvent } from '../utils/clientTelemetry';
+import { appLog } from '../utils/logging';
 
 const NAMEPLATE_BG = '#1a120a';
 const NAMEPLATE_TEXT = '#f5e6c8';
@@ -344,7 +345,7 @@ export function LibraryScreen({ navigation }: Props) {
       { skipBackendDelete: isPolicyDelete },
     );
     void refreshPublishedLookup().catch((error) => {
-      console.warn('Failed to refresh published lookup after delete', error);
+      appLog.warn('Failed to refresh published lookup after delete', error);
     });
 
     if (pendingDelete.communityAction === 'ORPHAN_THEN_DELETE') {

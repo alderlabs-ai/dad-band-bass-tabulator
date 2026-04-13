@@ -8,6 +8,7 @@ import { brandDisplayFontFamily } from '../constants/typography';
 import { resolveUpgradeTrigger, useUpgradePrompt } from '../features/subscription';
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
+import { appLog } from '../utils/logging';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ImportDetail'>;
 
@@ -39,7 +40,7 @@ export function ImportDetailScreen({ navigation, route }: Props) {
         return;
       }
 
-      console.warn('Could not create imported draft song', error);
+      appLog.warn('Could not create imported draft song', error);
     }
   };
 

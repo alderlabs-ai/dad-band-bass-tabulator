@@ -10,6 +10,7 @@ import { resolveUpgradeTrigger, useUpgradePrompt } from '../features/subscriptio
 import { RootStackParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { createId } from '../utils/ids';
+import { appLog } from '../utils/logging';
 import { parseTab } from '../utils/tabLayout';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ImportPaste'>;
@@ -54,7 +55,7 @@ export function ImportPasteScreen({ navigation }: Props) {
         return;
       }
 
-      console.warn('Could not create pasted draft song', error);
+      appLog.warn('Could not create pasted draft song', error);
     }
   };
 

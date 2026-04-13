@@ -15,6 +15,7 @@ import { Song } from '../types/models';
 import { flattenSongRowsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
 import { useWebPrintStyles } from '../utils/useWebPrintStyles';
+import { appLog } from '../utils/logging';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExportSetlist'>;
 
@@ -124,7 +125,7 @@ export function SetlistExportScreen({ navigation }: Props) {
           if (trigger === 'PDF_EXPORT') {
             setIsPdfLocked(true);
           } else {
-            console.warn('Setlist PDF export access check failed; falling back to local tier gate.', error);
+            appLog.warn('Setlist PDF export access check failed; falling back to local tier gate.', error);
             setIsPdfLocked(tier === 'FREE');
           }
         }

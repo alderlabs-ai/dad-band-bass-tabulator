@@ -22,6 +22,7 @@ import {
   DEFAULT_SUBSCRIPTION_PRICING,
   PRO_MONTHLY_PLAN_CODE,
 } from '../../constants/subscription';
+import { beLog } from '../../utils/logging';
 
 const storageKeys = {
   tier: 'basstab:subscription-tier',
@@ -136,7 +137,7 @@ class HybridSubscriptionService implements SubscriptionService {
       try {
         await AsyncStorage.removeItem(storageKeys.tier);
       } catch (error) {
-        console.warn('Subscription tier cleanup failed', error);
+        beLog.warn('Subscription tier cleanup failed', error);
       }
 
       return defaultFreeSnapshot;
@@ -145,7 +146,7 @@ class HybridSubscriptionService implements SubscriptionService {
     try {
       await AsyncStorage.removeItem(storageKeys.tier);
     } catch (error) {
-      console.warn('Subscription tier cleanup failed', error);
+      beLog.warn('Subscription tier cleanup failed', error);
     }
 
     return mapSnapshot(await this.api.getSubscription());
@@ -179,7 +180,7 @@ class HybridSubscriptionService implements SubscriptionService {
       cancelUrl: this.buildUrl('subscription/cancel'),
     };
 
-    console.info('[SubscriptionService] upgradeToPro payload', payload);
+    beLog.info('[SubscriptionService] upgradeToPro payload', payload);
 
     return this.api.upgrade(payload);
   }

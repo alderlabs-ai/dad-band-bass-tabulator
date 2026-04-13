@@ -3,6 +3,7 @@ import type { ErrorInfo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '../constants/colors';
+import { appLog } from '../utils/logging';
 
 interface SongEditorErrorBoundaryState {
   hasError: boolean;
@@ -19,7 +20,7 @@ export class SongEditorErrorBoundary extends Component<PropsWithChildren, SongEd
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     this.setState({ hasError: true, error, info });
-    console.error('[SongEditor] error boundary caught', error, info.componentStack);
+    appLog.error('[SongEditor] error boundary caught', error, info.componentStack);
   }
 
   render() {

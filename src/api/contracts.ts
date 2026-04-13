@@ -1,5 +1,6 @@
 import { SongBar, SongRow } from '../types/models';
 import { DEFAULT_SUBSCRIPTION_CAPABILITIES } from '../constants/subscription';
+import { appLog } from '../utils/logging';
 
 export interface SongMetadataDto {
   id: string;
@@ -785,7 +786,7 @@ export const parseSongMetadataListDto = (value: unknown): SongMetadataDto[] => {
     if (normalized) {
       results.push(normalized);
     } else {
-      console.warn('[BassTab] parseSongMetadataListDto: skipping invalid item', item);
+      appLog.warn('[BassTab] parseSongMetadataListDto: skipping invalid item', item);
     }
   }
   return results;
@@ -1003,7 +1004,7 @@ export const parseSubscriptionPricingDto = (value: unknown): SubscriptionPricing
   const plansValue = value.plans;
 
   if (!Array.isArray(plansValue)) {
-    console.warn('Unexpected subscription pricing payload', value);
+    appLog.warn('Unexpected subscription pricing payload', value);
     throw new Error('Invalid subscription pricing response payload.');
   }
 

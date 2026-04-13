@@ -35,6 +35,7 @@ import { RootStackParamList, TabParamList } from '../navigation/types';
 import { useBassTab } from '../store/BassTabProvider';
 import { CommunitySongAuthor, CommunitySongCard, SongChart } from '../types/models';
 import { SongListItem } from '../components/SongListItem';
+import { appLog } from '../utils/logging';
 import { flattenSongRowsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
 
@@ -340,13 +341,13 @@ export function ImportScreen({ navigation }: Props) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not load community charts.';
       setStatusMessage(message);
-      console.warn('Community song hydrate failed', error);
+      appLog.warn('Community song hydrate failed', error);
     } finally {
       setLoadingCatalog(false);
       // Refresh subscription state independently — failure here must not
       // corrupt the catalog error message or block the catalog from rendering.
       refresh().catch((error) => {
-        console.warn('Subscription refresh failed during community hydrate', error);
+        appLog.warn('Subscription refresh failed during community hydrate', error);
       });
     }
   }, [backendApi, refresh]);
@@ -451,7 +452,7 @@ export function ImportScreen({ navigation }: Props) {
       return;
     }
 
-    console.info('Community save attempt', {
+    appLog.info('Community save attempt', {
       song: selectedSong.title,
       hasCommunitySave,
       planCommunitySaveLimit,
@@ -460,7 +461,7 @@ export function ImportScreen({ navigation }: Props) {
     });
 
     if (!hasCommunitySave && hasCommunityLimit && communitySongsSaved >= planCommunitySaveLimit) {
-      console.warn(
+      appLog.warn(
         'Community save blocked',
         { communitySongsSaved, planCommunitySaveLimit, hasCommunitySave, song: selectedSong.title },
       );
@@ -477,7 +478,7 @@ export function ImportScreen({ navigation }: Props) {
         try {
           const communitySongId = resolveCommunitySaveId(songForSave);
           const savedResponse = await backendApi.saveCommunitySong({ communitySongId });
-          console.info(
+          appLog.info(
             'Saved community song response',
             savedResponse,
             { hasCommunitySave, communitySongsSaved, next: savedResponse.communitySongsSaved },
@@ -649,7 +650,7 @@ export function ImportScreen({ navigation }: Props) {
         );
         setCommunityCatalog(refreshedSongs);
       } catch (refreshError) {
-        console.warn('Community refresh after vote failed', refreshError);
+        appLog.warn('Community refresh after vote failed', refreshError);
       }
     } catch (error) {
       if (error instanceof BassTabApiError && (error.status === 400 || error.status === 404)) {

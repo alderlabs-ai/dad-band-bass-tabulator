@@ -44,6 +44,7 @@ import {
   SongMetadataDto,
   UpdateSongMetadataRequestDto,
 } from './contracts';
+import { beLog } from '../utils/logging';
 
 export interface BassTabApi {
   listSongs(): Promise<SongMetadataDto[]>;
@@ -113,7 +114,7 @@ const notifyBassTabApiUnauthorized = (event: UnauthorizedEvent) => {
     try {
       listener(event);
     } catch (error) {
-      console.warn('BassTab API unauthorized listener failed', error);
+      beLog.warn('BassTab API unauthorized listener failed', error);
     }
   });
 };
@@ -516,7 +517,7 @@ export class HttpBassTabApi implements BassTabApi {
     const requestedAt = Date.now();
     let response: Response;
 
-    console.info(`[BassTab API] ${method} ${url}`);
+    beLog.info(`[BassTab API] ${method} ${url}`);
 
     try {
       const requestHeaders: Record<string, string> = {
@@ -596,7 +597,7 @@ export class HttpBassTabApi implements BassTabApi {
 
     const json = await response.json();
     if (__DEV__) {
-      console.info('[BassTab API] response body', JSON.stringify(json));
+      beLog.info('[BassTab API] response body', JSON.stringify(json));
     }
     return { data: parse(json), status: response.status };
   }
@@ -646,9 +647,9 @@ export const createBassTabApiFromEnv = (): BassTabApi | null => {
 
   if (baseUrl) {
     if (envBaseUrl) {
-      console.info('[BassTabApi] env backend base URL detected', baseUrl);
+      beLog.info('[BassTabApi] env backend base URL detected', baseUrl);
     } else {
-      console.info('[BassTabApi] production runtime detected, using default API host', baseUrl);
+      beLog.info('[BassTabApi] production runtime detected, using default API host', baseUrl);
     }
     return createBassTabApi({ baseUrl });
   }

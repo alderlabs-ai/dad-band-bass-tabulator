@@ -14,6 +14,7 @@ import { useBassTab } from '../store/BassTabProvider';
 import { flattenSongRowsToChart } from '../utils/songChart';
 import { parseTab } from '../utils/tabLayout';
 import { useWebPrintStyles } from '../utils/useWebPrintStyles';
+import { appLog } from '../utils/logging';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExportSong'>;
 
@@ -109,7 +110,7 @@ export function SongExportScreen({ navigation, route }: Props) {
           if (trigger === 'PDF_EXPORT') {
             setIsPdfLocked(true);
           } else {
-            console.warn('Song PDF export access check failed; falling back to local tier gate.', error);
+            appLog.warn('Song PDF export access check failed; falling back to local tier gate.', error);
             setIsPdfLocked(tier === 'FREE');
           }
         }

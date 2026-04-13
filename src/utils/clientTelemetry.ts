@@ -1,3 +1,5 @@
+import { appLog } from './logging';
+
 type TelemetryLevel = 'info' | 'warn' | 'error';
 
 type TelemetryValue = string | number | boolean | null | undefined | TelemetryObject | TelemetryValue[];
@@ -182,12 +184,12 @@ export const logClientEvent = (
   details?: TelemetryObject,
 ) => {
   if (__DEV__) {
-    console.info('[ClientTelemetry]', level, event, details ?? {});
+    appLog.info('[ClientTelemetry]', level, event, details ?? {});
   }
 
   void sendPayload(buildPayload(level, event, details)).catch((error) => {
     if (__DEV__) {
-      console.warn('Client telemetry send failed', error);
+      appLog.warn('Client telemetry send failed', error);
     }
   });
 };

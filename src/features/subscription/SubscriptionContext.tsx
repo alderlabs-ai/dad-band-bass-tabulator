@@ -13,6 +13,7 @@ import * as ExpoLinking from 'expo-linking';
 
 import { useAuth } from '../auth/state/useAuth';
 import { logClientEvent } from '../../utils/clientTelemetry';
+import { appLog } from '../../utils/logging';
 import { mapSnapshotDto, subscriptionService } from './subscriptionService';
 import {
   DEFAULT_SUBSCRIPTION_CAPABILITIES,
@@ -154,11 +155,11 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       const nextPricing = await subscriptionService.loadPricing();
       updatePricingIfChanged(nextPricing);
     } catch (error) {
-      console.warn('Subscription pricing refresh failed', error);
+      appLog.warn('Subscription pricing refresh failed', error);
     }
 
     setSnapshot(nextSnapshot);
-    console.info(
+    appLog.info(
       'Subscription snapshot',
       nextSnapshot.communitySongsSaved,
       nextSnapshot.capabilities,
@@ -177,7 +178,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
         return current;
       }
 
-      console.info('Set communitySongsSaved', value);
+      appLog.info('Set communitySongsSaved', value);
       return { ...current, communitySongsSaved: value };
     });
   }, []);
@@ -196,7 +197,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
     }
 
     void refresh().catch((error) => {
-      console.warn('Subscription refresh failed after auth change', error);
+      appLog.warn('Subscription refresh failed after auth change', error);
     });
   }, [authState.type, cancelFinalizingPoll, refresh]);
 
@@ -218,7 +219,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
       lastForegroundRefreshAtRef.current = now;
       void refresh().catch((error) => {
-        console.warn('Subscription refresh failed after app foreground', error);
+        appLog.warn('Subscription refresh failed after app foreground', error);
       });
     });
 
@@ -232,7 +233,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       .loadCapabilityDefaults()
       .then(setCapabilityDefaults)
       .catch((error) => {
-        console.warn('Subscription capability defaults refresh failed', error);
+        appLog.warn('Subscription capability defaults refresh failed', error);
       });
   }, []);
 
@@ -284,7 +285,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
             return;
           }
         } catch (error) {
-          console.warn('Finalizing upgrade poll failed', error);
+          appLog.warn('Finalizing upgrade poll failed', error);
           logClientEvent('warn', 'subscription.finalize_poll_attempt_failed', {
             attempt: attempt + 1,
             error: error instanceof Error ? error.message : String(error),
@@ -341,7 +342,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
   const upgrade = useCallback(async () => {
     const displayedPrice = pickDisplayedPrice(snapshot, pricing);
-    console.info('[Subscription] upgrade handling', {
+    appLog.info('[Subscription] upgrade handling', {
       tier: snapshot?.tier,
       status: snapshot?.status,
       price: displayedPrice,
@@ -351,7 +352,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
     try {
       const response = await subscriptionService.upgradeToPro(displayedPrice.currency);
-      console.info('[Subscription] upgrade response', {
+      appLog.info('[Subscription] upgrade response', {
         mode: response.mode,
         checkoutSession: response.checkoutSession?.checkoutUrl,
       });
@@ -376,7 +377,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
 
       await refresh();
     } catch (error) {
-      console.error('[Subscription] upgrade failed', error);
+      appLog.error('[Subscription] upgrade failed', error);
       logClientEvent('error', 'subscription.upgrade_failed', {
         error: error instanceof Error ? error.message : String(error),
       });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BassTabApi, createBassTabApiFromEnv } from '../api';
 import { OwnershipStatus } from '../types/models';
+import { appLog } from '../utils/logging';
 
 export type PublishedSongInfo = {
   publishedSongId: string;
@@ -66,7 +67,7 @@ export function usePublishedSongLookup(backendApi?: BassTabApi | null) {
       setLookup(nextLookup);
       return nextLookup;
     } catch (error) {
-      console.warn('Failed to refresh published song lookup', error);
+      appLog.warn('Failed to refresh published song lookup', error);
       setLookup({});
       return {};
     } finally {

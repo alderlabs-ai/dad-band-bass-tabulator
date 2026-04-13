@@ -12,6 +12,7 @@ import type {
   VerifyEmailRequest,
 } from './authContracts.ts';
 import { logClientEvent } from '../../../utils/clientTelemetry';
+import { beLog } from '../../../utils/logging';
 
 type AuthAction =
   | 'session'
@@ -89,7 +90,7 @@ const logAuthPayloadShape = (action: AuthAction, payload: unknown) => {
   const record = asRecord(payload);
 
   if (!record) {
-    console.info(`[Auth Debug] ${action} payload type=${typeof payload}`);
+    beLog.info(`[Auth Debug] ${action} payload type=${typeof payload}`);
     return;
   }
 
@@ -99,7 +100,7 @@ const logAuthPayloadShape = (action: AuthAction, payload: unknown) => {
   const status = asString(record.status);
   const authenticatedFlag = record.authenticated;
 
-  console.info(
+  beLog.info(
     `[Auth Debug] ${action} keys=[${topLevelKeys}] status=${status ?? 'n/a'} authenticated=${String(authenticatedFlag)} userKeys=[${userKeys}]`,
   );
 };

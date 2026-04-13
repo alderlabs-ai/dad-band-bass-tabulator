@@ -29,6 +29,7 @@ import {
 import { createId } from '../utils/ids';
 import { createBassTabApiFromEnv } from '../api';
 import { usePublishedSongLookup } from '../hooks/usePublishedSongLookup';
+import { appLog } from '../utils/logging';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SongEditor'>;
 type SaveState = 'idle' | 'saving' | 'saved';
@@ -103,7 +104,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
       return;
     }
 
-    console.info('[SongEditor] opening song', {
+    appLog.info('[SongEditor] opening song', {
       songId: song.id,
       title: song.title,
       updatedAt: song.updatedAt,
@@ -116,7 +117,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
     try {
       nextDraft = cloneSong(song);
     } catch (error) {
-      console.error('[SongEditor] cloneSong failed', { error, song });
+      appLog.error('[SongEditor] cloneSong failed', { error, song });
       throw error;
     }
     setDraftSong(nextDraft);
@@ -144,7 +145,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
     try {
       return flattenSongRowsToChart(editorSong);
     } catch (error) {
-      console.error('[SongEditor] flattenSongRowsToChart failed', { error, song: editorSong });
+      appLog.error('[SongEditor] flattenSongRowsToChart failed', { error, song: editorSong });
       throw error;
     }
   }, [editorSong]);
@@ -308,7 +309,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
       return;
     }
 
-    console.info('[SongEditor] handleSave', {
+    appLog.info('[SongEditor] handleSave', {
       songId: editorSong.id,
       isDirty,
       hasSavedOnce,

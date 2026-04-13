@@ -27,6 +27,7 @@ import { UpgradeGateError } from '../features/subscription/upgradePrompts';
 import { Song, SongChart, SongRow, Setlist } from '../types/models';
 import { logClientEvent } from '../utils/clientTelemetry';
 import { createId } from '../utils/ids';
+import { appLog } from '../utils/logging';
 import { loadSnapshotFile, saveSnapshotFile, stateStorageLabel } from '../utils/stateSnapshot';
 import { mergeChartIntoSongRows } from '../utils/songChart';
 import { DEFAULT_BEAT_COUNT, getSlotsPerBar, parseTab } from '../utils/tabLayout';
@@ -433,7 +434,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       }
 
       failedSongIds.push(songId);
-      console.warn(`[BassTab] hydrateFromBackend: song detail unavailable for ${songId}`, result.reason);
+      appLog.warn(`[BassTab] hydrateFromBackend: song detail unavailable for ${songId}`, result.reason);
     });
 
     const nextSongs = songsMetadata.map((songMetadata) =>
@@ -461,15 +462,15 @@ export function BassTabProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (backendApi) {
-      console.info(`[BassTab] backend mode enabled: ${backendBaseUrl}`);
+      appLog.info(`[BassTab] backend mode enabled: ${backendBaseUrl}`);
 
       if (backendBaseUrl && /localhost|127\.0\.0\.1/.test(backendBaseUrl)) {
-        console.warn(
+        appLog.warn(
           '[BassTab] backend URL uses localhost/127.0.0.1. On real devices this points to the device itself.',
         );
       }
     } else {
-      console.warn('[BassTab] backend mode disabled. EXPO_PUBLIC_BASSTAB_API_URL is not set.');
+      appLog.warn('[BassTab] backend mode disabled. EXPO_PUBLIC_BASSTAB_API_URL is not set.');
     }
   }, [backendApi, backendBaseUrl]);
 
@@ -524,7 +525,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           setActiveSetlistId(normalizedSetlists[0].id);
         }
       } catch (error) {
-        console.warn('BassTab storage hydrate failed', error);
+        appLog.warn('BassTab storage hydrate failed', error);
       }
     };
 
@@ -554,7 +555,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         try {
           await hydrateFromBackend();
         } catch (error) {
-          console.warn('BassTab backend hydrate failed', error);
+          appLog.warn('BassTab backend hydrate failed', error);
           logClientEvent('error', 'basstab.hydrate_backend_failed', {
             error: error instanceof Error ? error.message : String(error),
           });
@@ -569,7 +570,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       try {
         await hydrateFromStorage();
       } catch (error) {
-        console.warn('BassTab storage hydrate failed', error);
+        appLog.warn('BassTab storage hydrate failed', error);
       } finally {
         if (isMounted) {
           setHasHydrated(true);
@@ -598,7 +599,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           AsyncStorage.setItem(storageKeys.setlist, JSON.stringify(setlist)),
         ]);
       } catch (error) {
-        console.warn('BassTab storage persist failed', error);
+        appLog.warn('BassTab storage persist failed', error);
       }
     };
 
@@ -778,12 +779,12 @@ export function BassTabProvider({ children }: PropsWithChildren) {
       try {
         await backendApi.deleteSong(targetBackendSongId);
       } catch (error) {
-        console.warn('BassTab backend deleteSong failed', { songId, backendSongId: targetBackendSongId, error });
+        appLog.warn('BassTab backend deleteSong failed', { songId, backendSongId: targetBackendSongId, error });
       }
       try {
         await backendApi.replacePlaylistOrder({ songIds: nextActiveSongIds });
       } catch (error) {
-        console.warn('BassTab backend replacePlaylistOrder failed after delete', error);
+        appLog.warn('BassTab backend replacePlaylistOrder failed after delete', error);
       }
     })();
   };
@@ -848,7 +849,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
           });
         }
       } catch (error) {
-        console.warn('BassTab backend updateSong failed', error);
+        appLog.warn('BassTab backend updateSong failed', error);
       }
     })();
   };
@@ -890,7 +891,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         },
       })
       .catch((error) => {
-        console.warn('BassTab backend updateSongChart failed', error);
+        appLog.warn('BassTab backend updateSongChart failed', error);
       });
   };
 
@@ -934,7 +935,7 @@ export function BassTabProvider({ children }: PropsWithChildren) {
         );
       })
       .catch((error) => {
-        console.warn(`BassTab backend ${action} failed`, error);
+        appLog.warn(`BassTab backend ${action} failed`, error);
       });
   };
 

@@ -16,6 +16,7 @@ import { isValidEmail } from '../features/auth/utils/email';
 import { useSubscription } from '../features/subscription';
 import { subscriptionService } from '../features/subscription/subscriptionService';
 import { RootStackParamList } from '../navigation/types';
+import { appLog } from '../utils/logging';
 
 // ---------------------------------------------------------------------------
 // Branding
@@ -91,7 +92,7 @@ export function AccountScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       void refresh().catch((error) => {
-        console.warn('Subscription refresh failed on account focus', error);
+        appLog.warn('Subscription refresh failed on account focus', error);
       });
     }, [refresh]),
   );
