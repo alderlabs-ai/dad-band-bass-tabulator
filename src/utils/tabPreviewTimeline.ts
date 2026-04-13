@@ -15,7 +15,7 @@ export const isNumericTabValue = (value: string): boolean => {
     return false;
   }
 
-  return /^\d+$/.test(trimmed.replace(/-+$/g, ''));
+  return /^\d+$/.test(trimmed.replace(/[.-]+$/g, ''));
 };
 
 const mapEmptyCountToStyle = (emptyCount: number): NoteRenderStyle => {
@@ -101,9 +101,27 @@ const hasAnyNoteAtAbsoluteSlot = (
   });
 };
 
+const hasDelimiterAtSlotOnString = (
+  rowBars: ParsedBar[],
+  stringName: string,
+  absoluteSlotIndex: number,
+): boolean => {
+  const location = getBarAndSlotAtAbsolute(rowBars, absoluteSlotIndex);
+
+  if (!location) {
+    return false;
+  }
+
+  const bar = rowBars[location.barIndex];
+  const value = bar?.cells[stringName]?.[location.slotIndex];
+
+  return typeof value === 'string' && value.includes('.');
+};
+
 const computeEmptySlotsUntilNextOnset = (
   rowBars: ParsedBar[],
   absoluteSlotIndex: number,
+  stringName: string,
   stopAtAbsoluteSlotExclusive?: number,
 ): number => {
   const totalSlots = rowBars.reduce((sum, bar) => sum + getBarSlotCount(bar), 0);
@@ -115,6 +133,11 @@ const computeEmptySlotsUntilNextOnset = (
   let emptyCount = 0;
 
   while (lookahead < maxSlotExclusive) {
+    // Dot delimiter cuts sustain only for the current string lane.
+    if (hasDelimiterAtSlotOnString(rowBars, stringName, lookahead)) {
+      break;
+    }
+
     if (hasAnyNoteAtAbsoluteSlot(rowBars, lookahead)) {
       break;
     }
@@ -147,9 +170,15 @@ export const getNoteRenderStyle = ({
     return 'short';
   }
 
+  // Dot delimiter in the current slot ends the note at the current subdivision.
+  if (hasDelimiterAtSlotOnString(rowBars, stringName, absoluteSlotIndex)) {
+    return 'short';
+  }
+
   const emptyCount = computeEmptySlotsUntilNextOnset(
     rowBars,
     absoluteSlotIndex,
+    stringName,
     absoluteBarEndSlotExclusive,
   );
 
