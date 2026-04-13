@@ -1,17 +1,21 @@
 export const SUGGESTED_BANDS = [
   'Mouse Rat',
   'The Butthole Surfers',
+  'The Slightly Evil Wizards',
   'Psychedelic Porn Crumpets',
   'King Gizzard & the Lizard Wizard',
   'Judge Dread',
   'Toad the Wet Sprocket',
-  'Titwank',
+  'The Nob Goblins',
   'Dr. Teeth and the Electric Mayhem',
   'Half Man Half Biscuit',
+  'Larry & The Leisure Suits',
   'The Knob Jockies',
   'Wet Blanket',
   'Love Fist',
   'The Bell Ends',
+  'Roger Wilco & The Janitors',
+  'Kebab Shop Philosophers',
 ];
 
 export const SUGGESTED_TITLES = [
