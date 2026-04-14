@@ -95,6 +95,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
   const [saveSignal, setSaveSignal] = useState(0);
   const [configBeatCount, setConfigBeatCount] = useState(DEFAULT_BEAT_COUNT);
   const baselineRef = useRef<string>('');
+  const activeSongIdRef = useRef<string | null>(null);
   const saveResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const song = songs.find((item) => item.id === songId);
@@ -123,7 +124,9 @@ export function SongEditorScreen({ navigation, route }: Props) {
     setDraftSong(nextDraft);
     baselineRef.current = serializeSongDraft(nextDraft);
     setSaveState('idle');
-    setHasSavedOnce(!isNew);
+    const isSongSwitch = activeSongIdRef.current !== song.id;
+    setHasSavedOnce((previous) => (isSongSwitch ? !isNew : previous || !isNew));
+    activeSongIdRef.current = song.id;
   }, [isNew, song?.id, song?.updatedAt]);
 
   useEffect(() => () => {

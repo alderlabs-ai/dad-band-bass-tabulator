@@ -568,8 +568,8 @@ export function SectionEditorCard({
                   <View style={[styles.rowCardHeader, isCompactLayout && styles.rowCardHeaderCompact]}>
                     <View style={styles.rowInfo}>
                       <Text style={styles.rowTitle}>
-                        {row.annotation.label?.trim()
-                          ? `${row.annotation.label.trim()}`
+                        {row.annotation.label.length > 0
+                          ? row.annotation.label
                           : `Bars ${row.startBarIndex + 1}-${lastBarNumber}`}
                       </Text>
                       <Text style={styles.rowSummary}>
@@ -696,7 +696,7 @@ export function SectionEditorCard({
                         <View style={[styles.rowMetaFields, isCompactLayout && styles.rowMetaFieldsCompact]}>
                           <View style={styles.rowMetaLabelField}>
                             <Field
-                              label="Block Label"
+                              label="Row Label"
                               value={row.annotation.label}
                               onChangeText={(value) => updateRowAnnotation(row.rowIndex, 'label', value)}
                               compact
@@ -1440,8 +1440,8 @@ function RowEditor({
       <View style={styles.activeRowHeader}>
         <View style={styles.activeRowTitleBlock}>
           <Text style={styles.activeRowTitle}>
-            {row.annotation.label?.trim()
-              ? `Editing ${row.annotation.label.trim()}`
+            {row.annotation.label.length > 0
+              ? `Editing ${row.annotation.label}`
               : `Editing Bars ${row.startBarIndex + 1}-${row.startBarIndex + row.bars.length}`}
           </Text>
           <Text style={styles.activeRowHint}>
@@ -1470,7 +1470,7 @@ function RowEditor({
       </View>
 
       <Field
-        label="Block Label"
+        label="Row Label"
         value={row.annotation.label}
         onChangeText={(value) => onRowAnnotationChange(row.rowIndex, 'label', value)}
         minHeight={46}

@@ -8,11 +8,11 @@ import { DadBandBrandBanner } from '../components/DadBandBrandBanner';
 import { TabPagePreview } from '../components/TabPagePreview';
 import { palette } from '../constants/colors';
 import { brandDisplayFontFamily } from '../constants/typography';
+import { LANDING_TAB_SNIPPET_SEEDS } from '../data/landingTabSnippetSeeds';
 import { SUGGESTED_BANDS, SUGGESTED_TITLES } from '../data/songSuggestions';
 import { useAuth } from '../features/auth/state/useAuth';
 import { useSubscription } from '../features/subscription/SubscriptionContext';
 import { RootStackParamList } from '../navigation/types';
-import { parseTab } from '../utils/tabLayout';
 
 const FALLBACK_FREE = {
   maxSongs: 20,
@@ -20,17 +20,10 @@ const FALLBACK_FREE = {
   maxAiGenerations: 15,
   maxDailyAiGenerations: 3,
 } as const;
-const landingTabSnippet = parseTab(
-  [
-    'G|----------------|----------------|',
-    'D|----------------|------5-7-5-----|',
-    'A|--5-----5-7-5---|--7---------5---|',
-    'E|------3---------|----------------|',
-  ].join('\n'),
-);
 const PREVIEW_KEYS = ['E', 'A', 'D', 'G', 'C#m', 'Bm', 'F#'] as const;
 const PREVIEW_TUNINGS = ['Std E', 'Drop D', 'Half Step Down'] as const;
 const PREVIEW_UPDATED = ['Updated 1d ago', 'Updated 2d ago', 'Updated 4d ago', 'Updated 1w ago'] as const;
+const LANDING_SNIPPET_STRING_ORDER = ['G', 'D', 'A', 'E'] as const;
 
 type PreviewSong = {
   title: string;
@@ -92,6 +85,52 @@ export function LandingScreen({ navigation }: Props) {
   const previewSongs = useMemo(() => buildPreviewSongs(5), []);
   const libraryPreviewSongs = previewSongs.slice(0, 2);
   const plannedPreviewSongs = previewSongs.slice(2, 5);
+  const selectedTabSnippet = useMemo(() => {
+    const randomIndex = Math.floor(Math.random() * LANDING_TAB_SNIPPET_SEEDS.length);
+    return LANDING_TAB_SNIPPET_SEEDS[randomIndex] ?? LANDING_TAB_SNIPPET_SEEDS[0];
+  }, []);
+  const tabSnippetStringNames = useMemo(() => {
+    const discovered = new Set<string>();
+
+    selectedTabSnippet.bars.forEach((bar) => {
+      Object.keys(bar.cells).forEach((stringName) => discovered.add(stringName));
+    });
+
+    const orderedKnown = LANDING_SNIPPET_STRING_ORDER.filter((stringName) => discovered.has(stringName));
+    const remaining = [...discovered]
+      .filter((stringName) => !LANDING_SNIPPET_STRING_ORDER.includes(stringName as (typeof LANDING_SNIPPET_STRING_ORDER)[number]))
+      .sort();
+
+    if (orderedKnown.length > 0) {
+      return [...orderedKnown, ...remaining];
+    }
+
+    return [...LANDING_SNIPPET_STRING_ORDER];
+  }, [selectedTabSnippet]);
+  const tabSnippetBars = useMemo(
+    () =>
+      selectedTabSnippet.bars.map((bar) => ({
+        ...(typeof bar.beatCount === 'number' ? { beatCount: bar.beatCount } : {}),
+        cells: Object.fromEntries(
+          tabSnippetStringNames.map((stringName) => [
+            stringName,
+            bar.cells[stringName] ?? ['--', '--', '--', '--', '--', '--', '--', '--'],
+          ]),
+        ),
+      })),
+    [selectedTabSnippet, tabSnippetStringNames],
+  );
+  const tabSnippetAnnotations = useMemo(
+    () => [
+      {
+        label: selectedTabSnippet.label,
+        beforeText: selectedTabSnippet.beforeText,
+        afterText: selectedTabSnippet.afterText,
+        barNotes: selectedTabSnippet.bars.map((bar) => bar.note?.trim() ?? ''),
+      },
+    ],
+    [selectedTabSnippet],
+  );
 
   const openApp = () => {
     if (isAuthenticated) {
@@ -330,16 +369,9 @@ export function LandingScreen({ navigation }: Props) {
                     compact
                     svgScaleProfile="performance"
                     barsPerRow={2}
-                    stringNames={landingTabSnippet.stringNames}
-                    bars={landingTabSnippet.bars}
-                    rowAnnotations={[
-                      {
-                        label: 'Verse groove',
-                        beforeText: 'Keep it tight with kick',
-                        afterText: '',
-                        barNotes: [],
-                      },
-                    ]}
+                    stringNames={tabSnippetStringNames}
+                    bars={tabSnippetBars}
+                    rowAnnotations={tabSnippetAnnotations}
                   />
                 </View>
               </View>
