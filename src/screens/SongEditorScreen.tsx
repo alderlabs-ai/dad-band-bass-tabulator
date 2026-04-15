@@ -374,20 +374,22 @@ export function SongEditorScreen({ navigation, route }: Props) {
         />
       </View>
 
-      <View style={styles.nameplate}>
-        <View style={styles.nameplateInner}>
-          <View style={styles.nameplateText}>
-            <Text style={styles.nameplateTitle}>Dad Band Library 🎸</Text>
-            <Text style={styles.nameplateSubtitle}>All the songs we sort of know.</Text>
-            <View style={styles.warningPill}>
-              <Text style={styles.warningPillText}>⚠️ Accuracy varies. Confidence does not.</Text>
+      {Platform.OS === 'web' && (
+        <View style={styles.nameplate}>
+          <View style={styles.nameplateInner}>
+            <View style={styles.nameplateText}>
+              <Text style={styles.nameplateTitle}>Dad Band Library 🎸</Text>
+              <Text style={styles.nameplateSubtitle}>All the songs we sort of know.</Text>
+              <View style={styles.warningPill}>
+                <Text style={styles.warningPillText}>⚠️ Accuracy varies. Confidence does not.</Text>
+              </View>
+            </View>
+            <View style={styles.badgeSlap}>
+              <DadBandBadge />
             </View>
           </View>
-          <View style={styles.badgeSlap}>
-            <DadBandBadge />
-          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.navBar}>
         <View style={styles.navLeft}>
@@ -847,7 +849,7 @@ const styles = StyleSheet.create({
     color: palette.text,
   },
   authorNoteInputNative: {
-    height: 90,
+    height: 72,
   },
   editorRegion: {
     flex: 1,
