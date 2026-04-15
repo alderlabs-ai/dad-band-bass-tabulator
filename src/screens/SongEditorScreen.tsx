@@ -81,8 +81,8 @@ const STRING_COUNT_OPTIONS = [4, 5];
 const AUTHOR_COMMENT_MAX = 200;
 
 export function SongEditorScreen({ navigation, route }: Props) {
-  const { width } = useWindowDimensions();
-  const isCompact = width < 760;
+  const { width, height } = useWindowDimensions();
+  const isCompact = Math.min(width, height) < 760;
   const { songId, isNew = false } = route.params;
   const { capabilities } = useSubscription();
   const { showUpgradePrompt } = useUpgradePrompt();
@@ -361,17 +361,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
           ? 'Unsaved changes'
           : 'All changes saved';
 
-  const editorBody = isNewEmpty ? (
-    <View style={styles.newSongStart}>
-      <Text style={styles.newSongStartText}>
-        Configure your strings, tuning, and beats per bar above, then start writing.
-      </Text>
-      <PrimaryButton
-        label="Start Writing"
-        onPress={handleStartEditing}
-      />
-    </View>
-  ) : (
+  const editorBody = (
     <>
       {lockMetadata ? (
         <Text style={styles.lockedMetaText}>
@@ -382,23 +372,37 @@ export function SongEditorScreen({ navigation, route }: Props) {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Tab Editor</Text>
         <Text style={styles.sectionMeta}>
-          Last updated {formatUpdatedAt(song.updatedAt)}
+          {isNewEmpty
+            ? 'Configure your chart and tap Start Writing to create your first row.'
+            : `Last updated ${formatUpdatedAt(song.updatedAt)}`}
         </Text>
       </View>
 
-      <SectionEditorCard
-        key={chart.id}
-        section={chart}
-        index={0}
-        isFirst
-        isLast
-        showSectionControls={false}
-        saveSignal={saveSignal}
-        onChange={handleChartChange}
-        onMoveUp={() => {}}
-        onMoveDown={() => {}}
-        onDelete={() => {}}
-      />
+      {isNewEmpty ? (
+        <View style={styles.newSongStart}>
+          <Text style={styles.newSongStartText}>
+            Configure your strings, tuning, and beats per bar above, then start writing.
+          </Text>
+          <PrimaryButton
+            label="Start Writing"
+            onPress={handleStartEditing}
+          />
+        </View>
+      ) : (
+        <SectionEditorCard
+          key={chart.id}
+          section={chart}
+          index={0}
+          isFirst
+          isLast
+          showSectionControls={false}
+          saveSignal={saveSignal}
+          onChange={handleChartChange}
+          onMoveUp={() => {}}
+          onMoveDown={() => {}}
+          onDelete={() => {}}
+        />
+      )}
     </>
   );
 
@@ -894,11 +898,15 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
   },
   newSongStart: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
-    paddingVertical: 48,
+    paddingVertical: 30,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
   },
   newSongStartText: {
     fontSize: 14,
