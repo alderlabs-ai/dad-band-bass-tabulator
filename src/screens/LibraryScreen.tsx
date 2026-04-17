@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Circle, Svg, Text as SvgText } from 'react-native-svg';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -95,6 +95,7 @@ export function LibraryScreen({ navigation }: Props) {
     backendApi,
   );
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'title' | 'artist'>('title');
   const [publishingSongId, setPublishingSongId] = useState<string | null>(null);
   const [songPendingDelete, setSongPendingDelete] = useState<SongPendingDelete | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
@@ -103,17 +104,22 @@ export function LibraryScreen({ navigation }: Props) {
   const filteredSongs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    if (!normalized) {
-      return songs;
-    }
+    const filtered = normalized
+      ? songs.filter((song) =>
+          [song.title, song.artist, song.authorComment ?? '', song.key, song.tuning]
+            .join(' ')
+            .toLowerCase()
+            .includes(normalized),
+        )
+      : songs;
 
-    return songs.filter((song) =>
-      [song.title, song.artist, song.authorComment ?? '', song.key, song.tuning]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalized),
-    );
-  }, [query, songs]);
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'artist') {
+        return (a.artist ?? '').localeCompare(b.artist ?? '') || (a.title ?? '').localeCompare(b.title ?? '');
+      }
+      return (a.title ?? '').localeCompare(b.title ?? '');
+    });
+  }, [query, songs, sortBy]);
 
   useEffect(() => {
     const payload = {
@@ -401,6 +407,20 @@ export function LibraryScreen({ navigation }: Props) {
 
       <SearchBar value={query} onChangeText={setQuery} placeholder="Search songs, artists, or something we half remember" />
 
+      <View style={styles.sortRow}>
+        {(['title', 'artist'] as const).map((option) => (
+          <Pressable
+            key={option}
+            style={[styles.sortTab, sortBy === option && styles.sortTabActive]}
+            onPress={() => setSortBy(option)}
+          >
+            <Text style={[styles.sortTabText, sortBy === option && styles.sortTabTextActive]}>
+              {option === 'title' ? 'Title' : 'Artist'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {filteredSongs.length === 0 ? (
         query.trim() ? (
           <EmptyState
@@ -597,6 +617,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: palette.textMuted,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#334155',
+    backgroundColor: 'transparent',
+  },
+  sortTabActive: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+  sortTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  sortTabTextActive: {
+    color: '#f8fafc',
   },
   modalBackdrop: {
     flex: 1,

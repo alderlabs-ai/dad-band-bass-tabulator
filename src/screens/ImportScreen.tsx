@@ -21,6 +21,7 @@ import { AppSectionNav } from '../components/AppSectionNav';
 import { EmptyState } from '../components/EmptyState';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenContainer } from '../components/ScreenContainer';
+import { SearchBar } from '../components/SearchBar';
 import { TabPagePreview, TabPreviewRenderMode } from '../components/TabPagePreview';
 import { palette } from '../constants/colors';
 import { brandDisplayFontFamily } from '../constants/typography';
@@ -287,6 +288,41 @@ export function ImportScreen({ navigation }: Props) {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [statusMessage, setStatusMessage] = useState('Browse community charts and save the ones you want to play.');
   const [ownershipFilter, setOwnershipFilter] = useState<'ALL' | 'MINE' | 'UNCLAIMED'>('ALL');
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'popularity' | 'title' | 'artist'>('popularity');
+
+  const filteredCatalog = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+
+    const afterOwnership = communityCatalog.filter((song) => {
+      if (ownershipFilter === 'MINE') {
+        return song.ownershipStatus === 'ACTIVE' && Boolean(currentUserId) && song.author?.userId === currentUserId;
+      }
+      if (ownershipFilter === 'UNCLAIMED') {
+        return song.ownershipStatus === 'ORPHANED';
+      }
+      return true;
+    });
+
+    const afterSearch = normalized
+      ? afterOwnership.filter((song) =>
+          [song.title, song.artist]
+            .join(' ')
+            .toLowerCase()
+            .includes(normalized),
+        )
+      : afterOwnership;
+
+    if (sortBy === 'title') {
+      return [...afterSearch].sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    }
+    if (sortBy === 'artist') {
+      return [...afterSearch].sort((a, b) =>
+        (a.artist ?? '').localeCompare(b.artist ?? '') || (a.title ?? '').localeCompare(b.title ?? ''),
+      );
+    }
+    return afterSearch;
+  }, [communityCatalog, ownershipFilter, currentUserId, query, sortBy]);
 
   const syncSavedCommunitySongs = useCallback(
     (savedSongs: Array<{ publishedSongId: string }>, catalog: CommunitySongListItem[]) => {
@@ -789,6 +825,8 @@ export function ImportScreen({ navigation }: Props) {
         </Text>
       ) : null}
 
+      <SearchBar value={query} onChangeText={setQuery} placeholder="Search title or artist" />
+
       <View style={styles.filterRow}>
         {(['ALL', 'MINE', 'UNCLAIMED'] as const).map((filter) => (
           <Pressable
@@ -798,6 +836,20 @@ export function ImportScreen({ navigation }: Props) {
           >
             <Text style={[styles.filterTabText, ownershipFilter === filter && styles.filterTabTextActive]}>
               {filter === 'ALL' ? 'All' : filter === 'MINE' ? 'Mine' : 'Orphaned'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.sortRow}>
+        {(['popularity', 'title', 'artist'] as const).map((option) => (
+          <Pressable
+            key={option}
+            style={[styles.sortTab, sortBy === option && styles.sortTabActive]}
+            onPress={() => setSortBy(option)}
+          >
+            <Text style={[styles.sortTabText, sortBy === option && styles.sortTabTextActive]}>
+              {option === 'popularity' ? 'Popular' : option === 'title' ? 'Title' : 'Artist'}
             </Text>
           </Pressable>
         ))}
@@ -813,19 +865,13 @@ export function ImportScreen({ navigation }: Props) {
           title="No community charts yet"
           description="Check back soon for shared songs."
         />
+      ) : filteredCatalog.length === 0 ? (
+        <EmptyState
+          title="Nothing matches that."
+          description="Try a different search or filter."
+        />
       ) : (
-        communityCatalog
-          .filter((song) => {
-            if (ownershipFilter === 'MINE') {
-              return song.ownershipStatus === 'ACTIVE' &&
-                Boolean(currentUserId) &&
-                song.author?.userId === currentUserId;
-            }
-            if (ownershipFilter === 'UNCLAIMED') {
-              return song.ownershipStatus === 'ORPHANED';
-            }
-            return true;
-          })
+        filteredCatalog
           .map((song) => {
           const isSaving = savingSongId === song.id;
           const isAdopting = adoptingSongId === song.id;
@@ -1139,6 +1185,30 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#334155',
+    backgroundColor: 'transparent',
+  },
+  sortTabActive: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+  sortTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  sortTabTextActive: {
+    color: '#f8fafc',
   },
   filterTab: {
     paddingHorizontal: 14,
