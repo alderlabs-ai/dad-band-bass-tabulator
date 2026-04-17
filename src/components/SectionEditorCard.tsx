@@ -35,6 +35,7 @@ import {
   EDITOR_EMPTY_SLOT,
   EditorBeat,
   EditorBeatSplit,
+  buildEditorPulseLabels,
   getSongBarBeatCountFromEvents,
   getSongBarSlotCountFromEvents,
   normalizeEditorSlotToken,
@@ -69,25 +70,7 @@ const normalizeBarNotes = (barCount: number, barNotes?: string[]): string[] =>
   Array.from({ length: barCount }, (_, index) => barNotes?.[index] ?? '');
 
 const getBeatPulseLabels = (beat: EditorBeat): string[] =>
-  Array.from({ length: beat.split }, (_, pulseIndex) => {
-    if (beat.pulseLabels[pulseIndex]) {
-      return beat.pulseLabels[pulseIndex];
-    }
-
-    if (pulseIndex === 0) {
-      return String(beat.beatNumber);
-    }
-
-    if (beat.split === 2) {
-      return '&';
-    }
-
-    if (beat.split === 3) {
-      return pulseIndex === 1 ? '&' : 'a';
-    }
-
-    return ['e', '&', 'a'][pulseIndex - 1] ?? '';
-  });
+  buildEditorPulseLabels(beat.beatNumber, beat.split);
 
 const getEditorBeatsForBar = (
   bar: SongBar,

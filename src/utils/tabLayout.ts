@@ -218,6 +218,26 @@ const joinRenderedBars = (segments: string[]) =>
   segments.map((segment, index) => (index === 0 ? segment : segment.slice(1))).join('');
 
 const getBeatGuideForBar = (bar: ParsedBar): string => {
+  const getCanonicalPulseLabel = (beatNumber: number, pulseIndex: number, pulseCount: number): string => {
+    if (pulseIndex === 0) {
+      return String(beatNumber);
+    }
+
+    if (pulseCount === 2) {
+      return pulseIndex === 1 ? '&' : '';
+    }
+
+    if (pulseCount === 3) {
+      return pulseIndex === 1 ? '&' : pulseIndex === 2 ? 'a' : '';
+    }
+
+    if (pulseCount === 4) {
+      return ['e', '&', 'a'][pulseIndex - 1] ?? '';
+    }
+
+    return pulseIndex === 1 ? '&' : '';
+  };
+
   const eventBackedBar = bar as ParsedBar & {
     events?: Array<{
       order?: number;
@@ -244,15 +264,7 @@ const getBeatGuideForBar = (bar: ParsedBar): string => {
             : eventIndex + 1;
 
         return Array.from({ length: pulseCount }, (_, pulseIndex) => {
-          const fallbackLabel =
-            pulseIndex === 0
-              ? String(fallbackBeat)
-              : pulseIndex === 1
-                ? '&'
-                : pulseIndex === 2
-                  ? 'a'
-                  : '';
-          const label = (event.pulseLabels?.[pulseIndex] ?? fallbackLabel).trim();
+          const label = getCanonicalPulseLabel(fallbackBeat, pulseIndex, pulseCount);
           return label.padEnd(2, ' ');
         }).join('');
       })

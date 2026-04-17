@@ -35,7 +35,7 @@ export const normalizeEditorSlotToken = (value: string | undefined): string => {
   return trimmed.length > 0 ? trimmed : EDITOR_EMPTY_SLOT;
 };
 
-const buildDefaultPulseLabels = (beatNumber: number, split: EditorBeatSplit): string[] => {
+export const buildEditorPulseLabels = (beatNumber: number, split: EditorBeatSplit): string[] => {
   if (split === 2) {
     return [String(beatNumber), '&'];
   }
@@ -86,7 +86,7 @@ const buildLegacyBeats = (
     beats.push({
       beatNumber,
       split,
-      pulseLabels: buildDefaultPulseLabels(beatNumber, split),
+      pulseLabels: buildEditorPulseLabels(beatNumber, split),
       segmentsByString,
     });
   }
@@ -125,7 +125,7 @@ export const projectSongBarToEditorBar = (
 
     const pulseLabels = normalizeSegments(event.pulseLabels, split).map((value, pulseIndex) =>
       value === EDITOR_EMPTY_SLOT
-        ? buildDefaultPulseLabels(beatNumber, split)[pulseIndex]
+        ? buildEditorPulseLabels(beatNumber, split)[pulseIndex]
         : value,
     );
 
@@ -157,10 +157,7 @@ export const projectEditorBarToSongBar = (
   stringNames: string[],
 ): SongBar => {
   const events: SongBarEvent[] = editorBar.beats.map((beat, beatIndex) => {
-    const pulseLabels =
-      beat.pulseLabels.length === beat.split
-        ? [...beat.pulseLabels]
-        : buildDefaultPulseLabels(beat.beatNumber, beat.split);
+    const pulseLabels = buildEditorPulseLabels(beat.beatNumber, beat.split);
     const cells: SongBarEvent['cells'] = Object.fromEntries(
       stringNames.map((stringName) => [
         stringName,
@@ -209,4 +206,3 @@ export const getSongBarSlotCountFromEvents = (
     (sum, beat) => sum + beat.split,
     0,
   );
-

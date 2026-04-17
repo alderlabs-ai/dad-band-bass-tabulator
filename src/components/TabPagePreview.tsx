@@ -79,6 +79,30 @@ const getEventPulseCount = (event: SongBarEvent): number =>
     ...Object.values(event.cells).map((eventCells) => eventCells?.[0]?.segments.length ?? 0),
   );
 
+const getCanonicalPulseLabel = (
+  beatNumber: number,
+  pulseIndex: number,
+  pulseCount: number,
+): string => {
+  if (pulseIndex === 0) {
+    return String(beatNumber);
+  }
+
+  if (pulseCount === 2) {
+    return pulseIndex === 1 ? '&' : '';
+  }
+
+  if (pulseCount === 3) {
+    return pulseIndex === 1 ? '&' : pulseIndex === 2 ? 'a' : '';
+  }
+
+  if (pulseCount === 4) {
+    return ['e', '&', 'a'][pulseIndex - 1] ?? '';
+  }
+
+  return pulseIndex === 1 ? '&' : '';
+};
+
 const clampBeatSplit = (value: number): 2 | 3 | 4 => {
   if (value <= 2) {
     return 2;
@@ -214,15 +238,7 @@ const getAsciiBarTextWidth = (bar: ParsedBar): number => {
           : eventIndex + 1;
 
       return Array.from({ length: pulseCount }, (_, pulseIndex) => {
-        const fallbackLabel =
-          pulseIndex === 0
-            ? String(fallbackBeat)
-            : pulseIndex === 1
-              ? '&'
-              : pulseIndex === 2
-                ? 'a'
-                : '';
-        const label = (event.pulseLabels[pulseIndex] ?? fallbackLabel).trim();
+        const label = getCanonicalPulseLabel(fallbackBeat, pulseIndex, pulseCount);
         return Math.max(2, label.length);
       }).reduce((sum, width) => sum + width, 0);
     })
@@ -257,15 +273,7 @@ const buildAsciiBeatGuideSegment = (bar: ParsedBar): string => {
             : eventIndex + 1;
 
         return Array.from({ length: pulseCount }, (_, pulseIndex) => {
-          const fallbackLabel =
-            pulseIndex === 0
-              ? String(fallbackBeat)
-              : pulseIndex === 1
-                ? '&'
-                : pulseIndex === 2
-                  ? 'a'
-                  : '';
-          const label = (event.pulseLabels[pulseIndex] ?? fallbackLabel).trim();
+          const label = getCanonicalPulseLabel(fallbackBeat, pulseIndex, pulseCount);
           return label.padEnd(2, ' ');
         }).join('');
       })
@@ -514,6 +522,7 @@ function AsciiTabPagePreviewV2({
 
 const buildAsciiV2Event = (
   event: SongBarEvent,
+  eventIndex: number,
   stringNames: string[],
 ): {
   pulseLabels: string[];
@@ -521,8 +530,12 @@ const buildAsciiV2Event = (
   pulseWidths: number[];
 } => {
   const pulseCount = getEventPulseCount(event);
+  const beatNumber =
+    typeof event.beatStart === 'number' && Number.isFinite(event.beatStart)
+      ? Math.max(1, Math.round(event.beatStart))
+      : eventIndex + 1;
   const pulseLabels = Array.from({ length: pulseCount }, (_, pulseIndex) =>
-    event.pulseLabels[pulseIndex] ?? '',
+    getCanonicalPulseLabel(beatNumber, pulseIndex, pulseCount),
   );
   const pulseTokensByString: Record<string, string[]> = {};
 
@@ -546,7 +559,7 @@ const buildAsciiV2Event = (
 
 const renderAsciiV2TimingBar = (bar: SongBar, stringNames: string[]): string => {
   const orderedEvents = getSortedBarEvents(bar);
-  const events = orderedEvents.map((event) => buildAsciiV2Event(event, stringNames));
+  const events = orderedEvents.map((event, eventIndex) => buildAsciiV2Event(event, eventIndex, stringNames));
   const body = events
     .map((event) =>
       event.pulseLabels
@@ -560,7 +573,7 @@ const renderAsciiV2TimingBar = (bar: SongBar, stringNames: string[]): string => 
 
 const renderAsciiV2StringBar = (bar: SongBar, stringName: string, stringNames: string[]): string => {
   const orderedEvents = getSortedBarEvents(bar);
-  const events = orderedEvents.map((event) => buildAsciiV2Event(event, stringNames));
+  const events = orderedEvents.map((event, eventIndex) => buildAsciiV2Event(event, eventIndex, stringNames));
   const body = events
     .map((event) =>
       event.pulseTokensByString[stringName]
@@ -577,7 +590,7 @@ const renderAsciiV2BarNotes = (rowBars: SongBar[], prefixChars: number, stringNa
   const rendered = joinRenderedBars(
     rowBars.map((bar) => {
       const barTextWidth = getSortedBarEvents(bar)
-        .map((event) => buildAsciiV2Event(event, stringNames).pulseWidths.reduce((sum, width) => sum + width, 0))
+        .map((event, eventIndex) => buildAsciiV2Event(event, eventIndex, stringNames).pulseWidths.reduce((sum, width) => sum + width, 0))
         .reduce((sum, width) => sum + width, 0);
       const note = (bar.note ?? '').trim();
       return `|${note.slice(0, barTextWidth).padEnd(barTextWidth, ' ')}|`;
