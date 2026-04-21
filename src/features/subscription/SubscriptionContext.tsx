@@ -162,7 +162,7 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
         ...nextSnapshot,
         capabilities: {
           ...nextSnapshot.capabilities,
-          maxCommunitySaves: usage.maxCommunitySaves,
+          maxCommunitySaves: usage.maxCommunitySaves >= INT_MAX ? null : usage.maxCommunitySaves,
         },
         communitySongsSaved: usage.communitySongsSaved,
         communitySongsRemaining: usage.communitySongsRemaining,
