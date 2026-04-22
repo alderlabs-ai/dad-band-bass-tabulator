@@ -265,39 +265,12 @@ export function SectionEditorCard({
   const quickPreviewRenderMode: TabPreviewRenderMode = !capabilities.svgEnabled ? 'ascii' : renderMode;
   const effectiveDefaultBeatCount = normalizeBeatCount(section.defaultBeatCount ?? DEFAULT_BEAT_COUNT);
 
-  const parsedChart = useMemo(() => parseTab(section.tab), [section.tab]);
-  const stringNames = stringNamesOverride ?? parsedChart.stringNames;
-  const bars = useMemo<SongBar[]>(
-    () =>
-      (barsOverride ?? parsedChart.bars).map((barValue) => {
-        const bar = barValue as SongBar;
-        return {
-        ...(bar.beatCount !== undefined ? { beatCount: bar.beatCount } : {}),
-        ...(bar.note !== undefined ? { note: bar.note } : {}),
-        ...(Array.isArray(bar.events)
-          ? {
-              events: bar.events?.map((event) => ({
-                ...event,
-                pulseLabels: [...event.pulseLabels],
-                cells: Object.fromEntries(
-                  stringNames.map((stringName) => [
-                    stringName,
-                    (event.cells[stringName] ?? []).map((cell) => ({
-                      text: cell.text,
-                      segments: [...cell.segments],
-                    })),
-                  ]),
-                ),
-              })),
-            }
-          : {}),
-        cells: Object.fromEntries(
-          stringNames.map((stringName) => [stringName, [...(bar.cells[stringName] ?? [])]]),
-        ),
-      };
-      }),
-    [barsOverride, parsedChart.bars, stringNames],
+  const parsedChart = useMemo(
+    () => (stringNamesOverride && barsOverride ? null : parseTab(section.tab)),
+    [barsOverride, section.tab, stringNamesOverride],
   );
+  const stringNames = stringNamesOverride ?? parsedChart?.stringNames ?? [];
+  const bars = (barsOverride ?? (parsedChart?.bars as SongBar[] | undefined) ?? []) as SongBar[];
   const rowBarCounts = useMemo(
     () => normalizeRowBarCounts(bars.length, section.rowBarCounts),
     [bars.length, section.rowBarCounts],

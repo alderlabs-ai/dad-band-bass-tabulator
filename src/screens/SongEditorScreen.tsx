@@ -293,20 +293,44 @@ export function SongEditorScreen({ navigation, route }: Props) {
         const nextRows = nextRowBarCounts.map((barCount, rowIndex) => {
           const sourceRow = current.rows[rowIndex];
           const annotation = nextRowAnnotations[rowIndex];
-          const rowBars = nextBars.slice(barCursor, barCursor + barCount).map((bar, barIndex) => ({
-            ...bar,
-            note:
-              annotation?.barNotes?.[barIndex] !== undefined
-                ? annotation.barNotes[barIndex]
-                : bar.note,
-          }));
+          const rowBars = nextBars.slice(barCursor, barCursor + barCount).map((bar, barIndex) => {
+            const nextNote = annotation?.barNotes?.[barIndex];
+            if (nextNote === undefined || nextNote === bar.note) {
+              return bar;
+            }
+
+            return {
+              ...bar,
+              note: nextNote,
+            };
+          });
           barCursor += barCount;
 
+          const nextLabel = annotation?.label ?? sourceRow?.label ?? '';
+          const nextBeforeText = annotation?.beforeText ?? sourceRow?.beforeText ?? '';
+          const nextAfterText = annotation?.afterText ?? sourceRow?.afterText ?? '';
+          const nextRowId = sourceRow?.id ?? createId('row');
+          const hasSameBars =
+            sourceRow?.bars.length === rowBars.length &&
+            sourceRow.bars.every((bar, barIndex) => bar === rowBars[barIndex]);
+
+          if (
+            sourceRow &&
+            hasSameBars &&
+            sourceRow.id === nextRowId &&
+            sourceRow.label === nextLabel &&
+            sourceRow.beforeText === nextBeforeText &&
+            sourceRow.afterText === nextAfterText &&
+            sourceRow.defaultBeatCount === nextDefaultBeatCount
+          ) {
+            return sourceRow;
+          }
+
           return {
-            id: sourceRow?.id ?? createId('row'),
-            label: annotation?.label ?? sourceRow?.label ?? '',
-            beforeText: annotation?.beforeText ?? sourceRow?.beforeText ?? '',
-            afterText: annotation?.afterText ?? sourceRow?.afterText ?? '',
+            id: nextRowId,
+            label: nextLabel,
+            beforeText: nextBeforeText,
+            afterText: nextAfterText,
             defaultBeatCount: nextDefaultBeatCount,
             bars: rowBars,
           };
@@ -326,17 +350,37 @@ export function SongEditorScreen({ navigation, route }: Props) {
           rows: current.rows.map((row, rowIndex) => {
             const annotation = updates.rowAnnotations![rowIndex];
             if (!annotation) return row;
+
+            const nextBars = row.bars.map((bar, barIndex) => {
+              if (annotation.barNotes?.[barIndex] === undefined || annotation.barNotes[barIndex] === bar.note) {
+                return bar;
+              }
+
+              return {
+                ...bar,
+                note: annotation.barNotes[barIndex],
+              };
+            });
+            const hasSameBars = row.bars.every((bar, barIndex) => bar === nextBars[barIndex]);
+            const nextLabel = annotation.label ?? row.label;
+            const nextBeforeText = annotation.beforeText ?? row.beforeText;
+            const nextAfterText = annotation.afterText ?? row.afterText;
+
+            if (
+              hasSameBars &&
+              nextLabel === row.label &&
+              nextBeforeText === row.beforeText &&
+              nextAfterText === row.afterText
+            ) {
+              return row;
+            }
+
             return {
               ...row,
-              label: annotation.label ?? row.label,
-              beforeText: annotation.beforeText ?? row.beforeText,
-              afterText: annotation.afterText ?? row.afterText,
-              bars: row.bars.map((bar, barIndex) => ({
-                ...bar,
-                note: annotation.barNotes?.[barIndex] !== undefined
-                  ? annotation.barNotes[barIndex]
-                  : bar.note,
-              })),
+              label: nextLabel,
+              beforeText: nextBeforeText,
+              afterText: nextAfterText,
+              bars: nextBars,
             };
           }),
         };
