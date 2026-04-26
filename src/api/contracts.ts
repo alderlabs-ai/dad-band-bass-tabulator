@@ -49,6 +49,7 @@ export interface SongChartRowDto {
   label: string | null;
   beforeText: string | null;
   afterText: string | null;
+  rowColor?: string | null;
   bars: SongChartBarDto[];
 }
 
@@ -353,6 +354,7 @@ const isSongChartRowDto = (value: unknown): value is SongChartRowDto => {
     (typeof value.label === 'string' || value.label === null || typeof value.label === 'undefined') &&
     (typeof value.beforeText === 'string' || value.beforeText === null || typeof value.beforeText === 'undefined') &&
     (typeof value.afterText === 'string' || value.afterText === null || typeof value.afterText === 'undefined') &&
+    (typeof value.rowColor === 'string' || value.rowColor === null || typeof value.rowColor === 'undefined') &&
     Array.isArray(value.bars) &&
     value.bars.every((bar) => isSongChartBarDto(bar))
   );
@@ -1127,6 +1129,7 @@ const normalizeSongChartRowDto = (
     label: isNullableString(value.label) ? value.label : null,
     beforeText: isNullableString(value.beforeText) ? value.beforeText : null,
     afterText: isNullableString(value.afterText) ? value.afterText : null,
+    rowColor: isNullableString(value.rowColor) ? value.rowColor : null,
     bars,
   };
 };

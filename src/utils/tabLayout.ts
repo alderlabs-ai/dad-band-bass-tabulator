@@ -1,3 +1,5 @@
+import type { RowColorKey } from '../constants/rowColors';
+
 const DEFAULT_STRING_NAMES = ['G', 'D', 'A', 'E'];
 export const MIN_BEAT_COUNT = 2;
 export const MAX_BEAT_COUNT = 6;
@@ -23,6 +25,7 @@ export interface TabRowAnnotation {
   beforeText: string;
   afterText: string;
   barNotes: string[];
+  rowColor?: RowColorKey | null;
 }
 
 export const normalizeBeatCount = (value?: number): number =>

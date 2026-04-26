@@ -13,6 +13,11 @@ import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg
 
 import { palette } from '../constants/colors';
 import {
+  DEFAULT_ROW_COLOR_SURFACE,
+  DEFAULT_ROW_COLOR_SURFACE_DARK,
+  getRowColorOption,
+} from '../constants/rowColors';
+import {
   ParsedBar,
   TabRowAnnotation,
   EMPTY_SLOT,
@@ -195,7 +200,39 @@ const buildRowAnnotationsFromSongRows = (songRows: SongRow[]): TabRowAnnotation[
     beforeText: row.beforeText ?? '',
     afterText: row.afterText ?? '',
     barNotes: row.bars.map((bar) => bar.note ?? ''),
+    rowColor: row.rowColor ?? null,
   }));
+
+const getSvgRowSurfaceStyle = (rowColor: string | null | undefined, dark: boolean): ViewStyle => {
+  const rowColorOption = getRowColorOption(rowColor);
+
+  return {
+    backgroundColor: rowColorOption
+      ? (dark ? rowColorOption.darkSurface : rowColorOption.lightSurface)
+      : (dark ? DEFAULT_ROW_COLOR_SURFACE_DARK : DEFAULT_ROW_COLOR_SURFACE),
+    borderColor: rowColorOption
+      ? rowColorOption.border
+      : (dark ? '#1f2937' : '#e2e8f0'),
+  };
+};
+
+const getSvgRowStripeStyle = (rowColor: string | null | undefined, dark: boolean): ViewStyle | null => {
+  const rowColorOption = getRowColorOption(rowColor);
+
+  if (!rowColorOption) {
+    return null;
+  }
+
+  return {
+    backgroundColor: dark ? rowColorOption.darkStripe : rowColorOption.lightStripe,
+  };
+};
+
+const getPerformanceTextWeightStyle = (svgScaleProfile?: TabPreviewSvgScaleProfile): TextStyle | undefined =>
+  svgScaleProfile === 'performance' ? styles.performanceTextWeight : undefined;
+
+const getPerformanceSvgWeight = (svgScaleProfile?: TabPreviewSvgScaleProfile): '700' | undefined =>
+  svgScaleProfile === 'performance' ? '700' : undefined;
 const slotToSegment = (value: string): string => {
   if (!value || isEmptySlotValue(value)) {
     return '--';
@@ -373,6 +410,7 @@ const buildSongRowsFromBarsInput = (
       label: annotation?.label ?? '',
       beforeText: annotation?.beforeText ?? '',
       afterText: annotation?.afterText ?? '',
+      rowColor: annotation?.rowColor ?? null,
       bars: rowBars.map((bar, barIndex) => ({
         ...bar,
         ...(annotation?.barNotes?.[barIndex] !== undefined
@@ -393,6 +431,7 @@ function InstructionAwareTabPagePreview({
   songRows = [],
   tone = 'light',
   compact = false,
+  svgScaleProfile = 'standard',
   style,
 }: TabPreviewContentProps) {
   const isDark = tone === 'dark';
@@ -416,6 +455,7 @@ function InstructionAwareTabPagePreview({
               <Text
                 style={[
                   compact ? styles.compactBlockLabel : styles.blockLabel,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkMetaText : styles.lightMetaText,
                 ]}
               >
@@ -437,6 +477,7 @@ function InstructionAwareTabPagePreview({
               <Text
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkAnnotationText : styles.lightAnnotationText,
                 ]}
               >
@@ -451,6 +492,7 @@ function InstructionAwareTabPagePreview({
             <Text
               style={[
                 compact ? styles.compactTabText : styles.tabText,
+                getPerformanceTextWeightStyle(svgScaleProfile),
                 isDark ? styles.darkTabText : styles.lightTabText,
               ]}
             >
@@ -468,6 +510,7 @@ function InstructionAwareTabPagePreview({
                 key={`instruction-aware-row-${row.id || rowIndex}-${stringName}`}
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkTabText : styles.lightTabText,
                 ]}
               >
@@ -585,8 +628,14 @@ function InstructionAwareSvgTabPagePreview({
         const instructionTextColor = isDark ? '#fef3c7' : '#451a03';
         const instructionNoteColor = isDark ? '#fbbf24' : '#b45309';
 
+        const rowStripeStyle = getSvgRowStripeStyle(row.rowColor, isDark);
+
         return (
-          <View key={`instruction-svg-row-${row.id || rowIndex}`} style={[styles.rowBlock, styles.svgRow]}>
+          <View
+            key={`instruction-svg-row-${row.id || rowIndex}`}
+            style={[styles.rowBlock, styles.svgRow, styles.svgRowShell, getSvgRowSurfaceStyle(row.rowColor, isDark)]}
+          >
+            {rowStripeStyle ? <View style={[styles.svgRowStripe, rowStripeStyle]} /> : null}
             {row.label?.trim() ? (
               <Text
                 style={[
@@ -641,6 +690,7 @@ function InstructionAwareSvgTabPagePreview({
                           ? svgScale.compactLabelFontSize
                           : svgScale.labelFontSize,
                         lineHeight: svgScale.labelLineHeight,
+                        fontWeight: getPerformanceSvgWeight(svgScaleProfile),
                       },
                       isDark ? styles.darkMetaText : styles.lightMetaText,
                     ]}
@@ -729,6 +779,7 @@ function InstructionAwareSvgTabPagePreview({
                           y={(stringPositions[stringIndex] ?? centerY) + 4}
                           fill={instructionTextColor}
                           fontSize={11}
+                          fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                         >
                           {(instructionLines[stringIndex] ?? '').slice(0, maxCharsPerLine)}
                         </SvgText>
@@ -739,6 +790,7 @@ function InstructionAwareSvgTabPagePreview({
                           y={centerY + 16}
                           fill={instructionNoteColor}
                           fontSize={10}
+                          fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                           textAnchor="middle"
                         >
                           {bar.note.trim()}
@@ -799,6 +851,7 @@ function InstructionAwareSvgTabPagePreview({
                         y={tripletY + SVG_SPLIT_TEXT_OFFSET + 2}
                         fill={accentColor}
                         fontSize={9}
+                        fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                         textAnchor="middle"
                         alignmentBaseline="middle"
                       >
@@ -878,6 +931,7 @@ function InstructionAwareSvgTabPagePreview({
                               y={fretY + SVG_FRET_TEXT_Y_OFFSET}
                               fill={fretColor}
                               fontSize={svgScale.fretFontSize}
+                              fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                               textAnchor="middle"
                               alignmentBaseline="middle"
                             >
@@ -1031,6 +1085,7 @@ function AsciiTabPagePreviewV2({
   songRows = [],
   tone = 'light',
   compact = false,
+  svgScaleProfile = 'standard',
   style,
 }: TabPreviewContentProps) {
   const isDark = tone === 'dark';
@@ -1048,6 +1103,7 @@ function AsciiTabPagePreviewV2({
               <Text
                 style={[
                   compact ? styles.compactBlockLabel : styles.blockLabel,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkMetaText : styles.lightMetaText,
                 ]}
               >
@@ -1069,6 +1125,7 @@ function AsciiTabPagePreviewV2({
               <Text
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkAnnotationText : styles.lightAnnotationText,
                 ]}
               >
@@ -1079,6 +1136,7 @@ function AsciiTabPagePreviewV2({
             <Text
               style={[
                 compact ? styles.compactTabText : styles.tabText,
+                getPerformanceTextWeightStyle(svgScaleProfile),
                 isDark ? styles.darkTabText : styles.lightTabText,
               ]}
             >
@@ -1090,6 +1148,7 @@ function AsciiTabPagePreviewV2({
                 key={`preview-v2-row-${row.id || rowIndex}-${stringName}`}
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkTabText : styles.lightTabText,
                 ]}
               >
@@ -1201,6 +1260,7 @@ function AsciiTabPagePreview({
   barsPerRow = 4,
   tone = 'light',
   compact = false,
+  svgScaleProfile = 'standard',
   style,
 }: TabPreviewContentProps) {
   const isDark = tone === 'dark';
@@ -1222,6 +1282,7 @@ function AsciiTabPagePreview({
               <Text
                 style={[
                   compact ? styles.compactBlockLabel : styles.blockLabel,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkMetaText : styles.lightMetaText,
                 ]}
               >
@@ -1243,6 +1304,7 @@ function AsciiTabPagePreview({
               <Text
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkAnnotationText : styles.lightAnnotationText,
                 ]}
               >
@@ -1253,6 +1315,7 @@ function AsciiTabPagePreview({
             <Text
               style={[
                 compact ? styles.compactTabText : styles.tabText,
+                getPerformanceTextWeightStyle(svgScaleProfile),
                 isDark ? styles.darkTabText : styles.lightTabText,
               ]}
             >
@@ -1264,6 +1327,7 @@ function AsciiTabPagePreview({
                 key={`preview-row-${rowIndex}-${stringName}`}
                 style={[
                   compact ? styles.compactTabText : styles.tabText,
+                  getPerformanceTextWeightStyle(svgScaleProfile),
                   isDark ? styles.darkTabText : styles.lightTabText,
                 ]}
               >
@@ -1476,8 +1540,19 @@ function SvgTabPagePreview({
         const fretColor = isDark ? palette.liveAccent : palette.primary;
         const accentColor = isDark ? palette.liveAccent : palette.accent;
 
+        const rowStripeStyle = getSvgRowStripeStyle(annotation?.rowColor, isDark);
+
         return (
-          <View key={`preview-row-${rowIndex}`} style={[styles.rowBlock, styles.svgRow]}>
+          <View
+            key={`preview-row-${rowIndex}`}
+            style={[
+              styles.rowBlock,
+              styles.svgRow,
+              styles.svgRowShell,
+              getSvgRowSurfaceStyle(annotation?.rowColor, isDark),
+            ]}
+          >
+            {rowStripeStyle ? <View style={[styles.svgRowStripe, rowStripeStyle]} /> : null}
             {annotation?.label?.trim() ? (
               <Text
                 style={[
@@ -1532,6 +1607,7 @@ function SvgTabPagePreview({
                           ? svgScale.compactLabelFontSize
                           : svgScale.labelFontSize,
                         lineHeight: svgScale.labelLineHeight,
+                        fontWeight: getPerformanceSvgWeight(svgScaleProfile),
                       },
                       isDark ? styles.darkMetaText : styles.lightMetaText,
                     ]}
@@ -1620,6 +1696,7 @@ function SvgTabPagePreview({
                         y={tripletY + SVG_SPLIT_TEXT_OFFSET + 2}
                         fill={accentColor}
                         fontSize={9}
+                        fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                         textAnchor="middle"
                         alignmentBaseline="middle"
                       >
@@ -1697,6 +1774,7 @@ function SvgTabPagePreview({
                               y={fretY + SVG_FRET_TEXT_Y_OFFSET}
                               fill={fretColor}
                               fontSize={svgScale.fretFontSize}
+                              fontWeight={getPerformanceSvgWeight(svgScaleProfile)}
                               textAnchor="middle"
                               alignmentBaseline="middle"
                             >
@@ -1783,6 +1861,7 @@ function AnnotationLine({
               : svgScale.annotationLineHeight,
             letterSpacing: 0.1,
           },
+          getPerformanceTextWeightStyle(svgScaleProfile),
           dark ? styles.darkAnnotationText : styles.lightAnnotationText,
         ]}
       >
@@ -1838,6 +1917,7 @@ function BarNotesRow({
                   ? svgScale.compactBarNoteLineHeight
                   : svgScale.barNoteLineHeight,
               },
+              getPerformanceTextWeightStyle(svgScaleProfile),
               dark ? styles.darkAnnotationText : styles.lightAnnotationText,
               { width: barWidths[index] ?? barWidths[barWidths.length - 1] ?? 0 },
             ]}
@@ -1922,6 +2002,9 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     ...monoWeb,
   },
+  performanceTextWeight: {
+    fontWeight: '600',
+  },
   darkTabText: {
     color: palette.liveText,
   },
@@ -2004,6 +2087,23 @@ const styles = StyleSheet.create({
   },
   svgRow: {
     gap: 8,
+  },
+  svgRowShell: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    paddingLeft: 18,
+  },
+  svgRowStripe: {
+    position: 'absolute',
+    top: 10,
+    bottom: 10,
+    left: 0,
+    width: 6,
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
   },
   svgRowContent: {
     flexDirection: 'row',

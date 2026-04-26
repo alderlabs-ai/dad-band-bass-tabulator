@@ -19,6 +19,7 @@ import {
   type SongMetadataDto,
   type SongDto,
 } from '../api';
+import type { RowColorKey } from '../constants/rowColors';
 import { FREE_SETLIST_TITLE } from '../constants/setlist';
 import { tuningOptions } from '../constants/tunings';
 import { useAuth } from '../features/auth/state/useAuth';
@@ -53,6 +54,7 @@ interface LegacySection {
     beforeText: string;
     afterText: string;
     barNotes?: string[];
+    rowColor?: RowColorKey | null;
   }>;
   rowBarCounts?: number[];
 }
@@ -146,6 +148,7 @@ const createEmptyRow = (
   label,
   beforeText: '',
   afterText: '',
+  rowColor: null,
   defaultBeatCount: DEFAULT_BEAT_COUNT,
   bars: Array.from({ length: 4 }, () => ({
     id: createId('bar'),
@@ -257,6 +260,7 @@ const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
       authorComment: currentSong.authorComment ?? null,
       rows: currentSong.rows.map((row) => ({
         ...row,
+        rowColor: row.rowColor ?? null,
         bars: row.bars.map((bar) =>
           normalizeBarForEditor(
             {
@@ -302,9 +306,14 @@ const migrateLegacySong = (legacySong: Song | LegacySong): Song => {
           rowAnnotations:
             section.rowAnnotations?.map((annotation, rowIndex: number) =>
               rowIndex === 0
-                ? { ...annotation, label: annotation.label || section.name, barNotes: annotation.barNotes ?? [] }
-                : { ...annotation, barNotes: annotation.barNotes ?? [] },
-            ) ?? [{ label: section.name, beforeText: '', afterText: '', barNotes: [] }],
+                ? {
+                    ...annotation,
+                    label: annotation.label || section.name,
+                    barNotes: annotation.barNotes ?? [],
+                    rowColor: annotation.rowColor ?? null,
+                  }
+                : { ...annotation, barNotes: annotation.barNotes ?? [], rowColor: annotation.rowColor ?? null },
+            ) ?? [{ label: section.name, beforeText: '', afterText: '', barNotes: [], rowColor: null }],
           rowBarCounts: section.rowBarCounts ?? [],
         },
       );

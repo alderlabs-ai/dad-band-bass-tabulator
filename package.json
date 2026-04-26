@@ -4,10 +4,11 @@
   "main": "index.ts",
   "scripts": {
     "build": "expo export --platform web",
-    "start": "npx serve dist -s -l tcp://0.0.0.0:${PORT:-3000}",
+    "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "serve:web": "npx serve dist -s -l tcp://0.0.0.0:${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "export:web": "expo export --platform web",
     "verify:linux": "npm run typecheck && npm run export:web",

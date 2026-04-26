@@ -1,3 +1,4 @@
+import { isRowColorKey } from '../constants/rowColors';
 import { Setlist, Song, SongBar, SongBarEvent, SongRow } from '../types/models';
 import { createId } from '../utils/ids';
 import { isInstructionBar, normalizeBarForEditor } from '../utils/songBars';
@@ -240,6 +241,7 @@ export const toSongChartDto = (song: Pick<Song, 'stringNames' | 'rows'>): SongCh
     label: toNullableText(row.label),
     beforeText: toNullableText(row.beforeText),
     afterText: toNullableText(row.afterText),
+    rowColor: row.rowColor ?? null,
     bars: row.bars.map((bar) => toChartBarDto(song.stringNames, bar)),
   })),
 });
@@ -257,6 +259,7 @@ const fromSongChartRowDto = (
   label: row.label ?? '',
   beforeText: row.beforeText ?? '',
   afterText: row.afterText ?? '',
+  rowColor: isRowColorKey(row.rowColor) ? row.rowColor : null,
   bars: row.bars.map((bar) => ({
     ...(normalizeBarForEditor(
       bar.type === 'INSTRUCTION'

@@ -11,6 +11,7 @@ const cloneAnnotation = (annotation?: Partial<TabRowAnnotation>): TabRowAnnotati
   beforeText: annotation?.beforeText ?? '',
   afterText: annotation?.afterText ?? '',
   barNotes: [...(annotation?.barNotes ?? [])],
+  rowColor: annotation?.rowColor ?? null,
 });
 
 export const normalizeRowBarCounts = (
@@ -56,6 +57,7 @@ export const flattenSongRowsToChart = (song: Pick<Song, 'stringNames' | 'rows'>)
         beforeText: row.beforeText,
         afterText: row.afterText,
         barNotes: row.bars.map((bar) => bar.note ?? ''),
+        rowColor: row.rowColor ?? null,
       }),
     ),
     rowBarCounts: song.rows.map((row) => row.bars.length),
@@ -88,6 +90,7 @@ export const mergeChartIntoSongRows = (
       label: annotation.label.trim(),
       beforeText: annotation.beforeText,
       afterText: annotation.afterText,
+      rowColor: annotation.rowColor ?? null,
       defaultBeatCount,
       bars: nextRowBars.map((bar, barIndex) => ({
         ...normalizeBarForEditor(

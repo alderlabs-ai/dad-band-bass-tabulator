@@ -313,6 +313,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
             beforeText: row.beforeText,
             afterText: row.afterText,
             barNotes: row.bars.map((bar) => bar.note ?? ''),
+            rowColor: row.rowColor ?? null,
           }));
         const nextDefaultBeatCount = normalizeBeatCount(
           updates.defaultBeatCount ??
@@ -341,6 +342,10 @@ export function SongEditorScreen({ navigation, route }: Props) {
           const nextLabel = annotation?.label ?? sourceRow?.label ?? '';
           const nextBeforeText = annotation?.beforeText ?? sourceRow?.beforeText ?? '';
           const nextAfterText = annotation?.afterText ?? sourceRow?.afterText ?? '';
+          const nextRowColor =
+            annotation && 'rowColor' in annotation
+              ? annotation.rowColor ?? null
+              : sourceRow?.rowColor ?? null;
           const nextRowId = sourceRow?.id ?? createId('row');
           const hasSameBars =
             sourceRow?.bars.length === rowBars.length &&
@@ -353,6 +358,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
             sourceRow.label === nextLabel &&
             sourceRow.beforeText === nextBeforeText &&
             sourceRow.afterText === nextAfterText &&
+            (sourceRow.rowColor ?? null) === nextRowColor &&
             sourceRow.defaultBeatCount === nextDefaultBeatCount
           ) {
             return sourceRow;
@@ -363,6 +369,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
             label: nextLabel,
             beforeText: nextBeforeText,
             afterText: nextAfterText,
+            rowColor: nextRowColor,
             defaultBeatCount: nextDefaultBeatCount,
             bars: rowBars,
           };
@@ -397,12 +404,17 @@ export function SongEditorScreen({ navigation, route }: Props) {
             const nextLabel = annotation.label ?? row.label;
             const nextBeforeText = annotation.beforeText ?? row.beforeText;
             const nextAfterText = annotation.afterText ?? row.afterText;
+            const nextRowColor =
+              'rowColor' in annotation
+                ? annotation.rowColor ?? null
+                : row.rowColor ?? null;
 
             if (
               hasSameBars &&
               nextLabel === row.label &&
               nextBeforeText === row.beforeText &&
-              nextAfterText === row.afterText
+              nextAfterText === row.afterText &&
+              (row.rowColor ?? null) === nextRowColor
             ) {
               return row;
             }
@@ -412,6 +424,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
               label: nextLabel,
               beforeText: nextBeforeText,
               afterText: nextAfterText,
+              rowColor: nextRowColor,
               bars: nextBars,
             };
           }),
@@ -469,6 +482,7 @@ export function SongEditorScreen({ navigation, route }: Props) {
           label: 'Intro',
           beforeText: '',
           afterText: '',
+          rowColor: null,
           defaultBeatCount: configBeatCount,
           bars: Array.from({ length: 4 }, () => ({
             id: createId('bar'),

@@ -1,8 +1,11 @@
+import type { RowColorKey } from '../constants/rowColors';
+
 export interface TabRowAnnotation {
   label: string;
   beforeText: string;
   afterText: string;
   barNotes: string[];
+  rowColor?: RowColorKey | null;
 }
 
 export interface SongEventCell {
@@ -54,6 +57,7 @@ export interface SongRow {
   label: string;
   beforeText: string;
   afterText: string;
+  rowColor?: RowColorKey | null;
   defaultBeatCount?: number;
   bars: SongBar[];
 }

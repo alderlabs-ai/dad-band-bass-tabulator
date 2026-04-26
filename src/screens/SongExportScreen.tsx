@@ -16,6 +16,9 @@ import { useWebPrintStyles } from '../utils/useWebPrintStyles';
 import { appLog } from '../utils/logging';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExportSong'>;
+const EXPORT_PAGE_MAX_WIDTH = 820;
+const EXPORT_PAGE_HORIZONTAL_PADDING = 24;
+const EXPORT_SVG_VIEWPORT_WIDTH = EXPORT_PAGE_MAX_WIDTH - EXPORT_PAGE_HORIZONTAL_PADDING * 2;
 
 const printCss = `
   @page {
@@ -283,7 +286,8 @@ export function SongExportScreen({ navigation, route }: Props) {
               tone="light"
               compact
               renderMode={renderMode}
-              svgScaleProfile="standard"
+              svgScaleProfile="performance"
+              svgViewportWidth={EXPORT_SVG_VIEWPORT_WIDTH}
             />
           </View>
 
@@ -374,9 +378,9 @@ const styles = StyleSheet.create({
   },
   pageSheet: {
     width: '100%',
-    maxWidth: 820,
+    maxWidth: EXPORT_PAGE_MAX_WIDTH,
     borderRadius: 18,
-    paddingHorizontal: 24,
+    paddingHorizontal: EXPORT_PAGE_HORIZONTAL_PADDING,
     paddingVertical: 24,
     backgroundColor: '#fffdf8',
     borderWidth: 1,
@@ -420,7 +424,7 @@ const styles = StyleSheet.create({
   },
   lockedCard: {
     width: '100%',
-    maxWidth: 820,
+    maxWidth: EXPORT_PAGE_MAX_WIDTH,
     borderRadius: 20,
     padding: 20,
     backgroundColor: '#0b0b0f',

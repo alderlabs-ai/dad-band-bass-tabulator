@@ -84,6 +84,7 @@ Most of this app can be developed and validated on Linux:
 
 - install dependencies with `npm install`
 - run the app with `npm start`
+- serve the exported web build with `npm run serve:web`
 - validate the code with `npm run verify:linux`
 
 `verify:linux` currently checks:

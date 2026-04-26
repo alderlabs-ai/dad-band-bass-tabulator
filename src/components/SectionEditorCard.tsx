@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 
 import { palette } from '../constants/colors';
+import { ROW_COLOR_OPTIONS, getRowColorOption } from '../constants/rowColors';
 import { SongBar, SongChart, TabRowAnnotation } from '../types/models';
 import { normalizeRowBarCounts } from '../utils/songChart';
 import { createId } from '../utils/ids';
@@ -275,6 +276,7 @@ export function SectionEditorCard({
   const editorSvgViewportWidth = Math.max(260, width - (isPreviewCompact ? 72 : 148));
   const [activeRowIndex, setActiveRowIndex] = useState(-1);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [openRowColorPickerIndex, setOpenRowColorPickerIndex] = useState<number | null>(null);
   const [copiedBlock, setCopiedBlock] = useState<{
     bars: SongBar[];
     annotation: TabRowAnnotation;
@@ -326,6 +328,7 @@ export function SectionEditorCard({
           rowBarCounts[rowIndex] ?? 0,
           section.rowAnnotations?.[rowIndex]?.barNotes,
         ),
+        rowColor: section.rowAnnotations?.[rowIndex]?.rowColor ?? null,
       })),
     [rowBarCounts, rowCount, section.rowAnnotations],
   );
@@ -380,7 +383,7 @@ export function SectionEditorCard({
     onChange({
       rowAnnotations: rowAnnotations.map((annotation, currentIndex) =>
         currentIndex === rowIndex
-          ? { ...annotation, [field]: value }
+          ? { ...annotation, [field]: field === 'rowColor' && value.length === 0 ? null : value }
           : annotation,
       ),
     });
@@ -403,6 +406,7 @@ export function SectionEditorCard({
     );
 
     setActiveRowIndex(clampedRowIndex);
+    setOpenRowColorPickerIndex(null);
     inputRefs.current[key]?.focus();
   };
 
@@ -471,10 +475,12 @@ export function SectionEditorCard({
       rowAnnotations: section.rowAnnotations?.map((annotation) => ({ ...annotation })),
       rowBarCounts: section.rowBarCounts ? [...section.rowBarCounts] : undefined,
     });
+    setOpenRowColorPickerIndex(null);
     setActiveRowIndex(rowIndex);
   };
 
   const handleSaveRowEdit = () => {
+    setOpenRowColorPickerIndex(null);
     setActiveRowIndex(-1);
     setRowEditSnapshot(null);
   };
@@ -490,6 +496,7 @@ export function SectionEditorCard({
       });
     }
 
+    setOpenRowColorPickerIndex(null);
     setActiveRowIndex(-1);
     setRowEditSnapshot(null);
   };
@@ -634,6 +641,7 @@ export function SectionEditorCard({
                     beforeText: row.annotation.beforeText,
                     afterText: row.annotation.afterText,
                     barNotes: [...row.annotation.barNotes],
+                    rowColor: row.annotation.rowColor ?? null,
                   },
                 });
               };
@@ -737,6 +745,7 @@ export function SectionEditorCard({
                   beforeText: '',
                   afterText: '',
                   barNotes: Array.from({ length: barsPerRow }, () => ''),
+                  rowColor: null,
                 });
                 const nextRowBarCounts = [...rowBarCounts];
                 nextRowBarCounts.splice(row.rowIndex + 1, 0, barsPerRow);
@@ -801,6 +810,7 @@ export function SectionEditorCard({
                   beforeText: copiedBlock.annotation.beforeText,
                   afterText: copiedBlock.annotation.afterText,
                   barNotes: [...copiedBlock.annotation.barNotes],
+                  rowColor: copiedBlock.annotation.rowColor ?? null,
                 });
                 const nextRowBarCounts = [...rowBarCounts];
                 nextRowBarCounts.splice(insertRowIndex, 0, copiedBlock.bars.length);
@@ -808,8 +818,16 @@ export function SectionEditorCard({
                 commitChart(nextBars, nextAnnotations, nextRowBarCounts);
               };
 
+              const rowColorOption = getRowColorOption(row.annotation.rowColor);
+
               return (
-                <View key={`${section.id}-row-${row.rowIndex}`} style={styles.rowCard}>
+                <View
+                  key={`${section.id}-row-${row.rowIndex}`}
+                  style={[
+                    styles.rowCard,
+                    openRowColorPickerIndex === row.rowIndex && styles.rowCardForeground,
+                  ]}
+                >
                   <View style={[styles.rowCardHeader, isCompactLayout && styles.rowCardHeaderCompact]}>
                     <View style={styles.rowInfo}>
                       <Text style={styles.rowTitle}>
@@ -941,7 +959,7 @@ export function SectionEditorCard({
                         <View style={[styles.rowMetaFields, isCompactLayout && styles.rowMetaFieldsCompact]}>
                           <View style={styles.rowMetaLabelField}>
                             <Field
-                              label="Row Label"
+                              label="Title"
                               value={row.annotation.label}
                               onChangeText={(value) => updateRowAnnotation(row.rowIndex, 'label', value)}
                               compact
@@ -953,6 +971,70 @@ export function SectionEditorCard({
                               value={row.barCount}
                               onCommit={updateRowBarCount}
                             />
+                          </View>
+                          <View style={styles.rowMetaColorField}>
+                            <Text style={styles.label}>Colour</Text>
+                            <View style={styles.rowColorControlWrap}>
+                              <Pressable
+                                onPress={() =>
+                                  setOpenRowColorPickerIndex((current) =>
+                                    current === row.rowIndex ? null : row.rowIndex,
+                                  )
+                                }
+                                style={styles.rowColorButton}
+                              >
+                                <View
+                                  style={[
+                                    styles.rowColorSwatch,
+                                    rowColorOption
+                                      ? {
+                                          backgroundColor: rowColorOption.swatch,
+                                          borderColor: rowColorOption.border,
+                                        }
+                                      : styles.rowColorSwatchEmpty,
+                                  ]}
+                                />
+                                <Ionicons name="chevron-down" size={14} color={palette.textMuted} />
+                              </Pressable>
+                              {openRowColorPickerIndex === row.rowIndex ? (
+                                <View style={styles.rowColorPickerPopover}>
+                                  <View style={styles.rowColorPickerGrid}>
+                                    {ROW_COLOR_OPTIONS.map((option) => {
+                                      const isSelected = row.annotation.rowColor === option.key;
+                                      return (
+                                        <Pressable
+                                          key={option.key}
+                                          onPress={() => {
+                                            updateRowAnnotation(row.rowIndex, 'rowColor', option.key);
+                                            setOpenRowColorPickerIndex(null);
+                                          }}
+                                          style={[
+                                            styles.rowColorPickerSwatch,
+                                            {
+                                              backgroundColor: option.swatch,
+                                              borderColor: option.border,
+                                            },
+                                            isSelected && styles.rowColorPickerSwatchActive,
+                                          ]}
+                                        />
+                                      );
+                                    })}
+                                    <Pressable
+                                      onPress={() => {
+                                        updateRowAnnotation(row.rowIndex, 'rowColor', '');
+                                        setOpenRowColorPickerIndex(null);
+                                      }}
+                                      style={[
+                                        styles.rowColorPickerClear,
+                                        !row.annotation.rowColor && styles.rowColorPickerSwatchActive,
+                                      ]}
+                                    >
+                                      <Text style={styles.rowColorPickerClearText}>Clear</Text>
+                                    </Pressable>
+                                  </View>
+                                </View>
+                              ) : null}
+                            </View>
                           </View>
                         </View>
                       </View>
@@ -2943,12 +3025,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowCard: {
+    position: 'relative',
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 16,
     padding: 12,
     gap: 10,
     backgroundColor: '#f8fafc',
+  },
+  rowCardForeground: {
+    zIndex: 40,
+    elevation: 8,
   },
   rowCardHeader: {
     flexDirection: 'row',
@@ -3013,6 +3100,81 @@ const styles = StyleSheet.create({
   },
   rowMetaCountField: {
     width: 72,
+  },
+  rowMetaColorField: {
+    width: 64,
+  },
+  rowColorControlWrap: {
+    position: 'relative',
+  },
+  rowColorButton: {
+    minHeight: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  rowColorSwatch: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  rowColorSwatchEmpty: {
+    backgroundColor: '#ffffff',
+    borderColor: palette.border,
+  },
+  rowColorPickerPopover: {
+    position: 'absolute',
+    top: 44,
+    right: 0,
+    zIndex: 20,
+    width: 148,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#ffffff',
+    padding: 10,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  rowColorPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rowColorPickerSwatch: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  rowColorPickerSwatchActive: {
+    borderColor: palette.text,
+    borderWidth: 2,
+  },
+  rowColorPickerClear: {
+    width: '100%',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#f8fafc',
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowColorPickerClearText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.textMuted,
   },
   annotationCard: {
     gap: 10,
